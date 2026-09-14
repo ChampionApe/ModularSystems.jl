@@ -22,4 +22,5 @@ using Test
     include("tags.jl")
     include("indexset.jl")
     include("swap.jl")
+    include("residuals.jl")
 end
