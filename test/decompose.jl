@@ -198,6 +198,46 @@
         @test occursin("objective", e.msg)
     end
 
+    @testset "a maximum matching is found when the pairings give none" begin
+        # A block with no pairings at all: the matching has to be computed from scratch, and the
+        # epoch-stamped search has to find the same perfect matching a seeded one would.
+        n = 60
+        m = Model()
+        @variable(m, s0)
+        @variable(m, v[1:n])
+        b = Block(m)
+        for i in 1:n
+            prev = i == 1 ? s0 : v[i - 1]
+            add_constraint!(b, @build_constraint(v[i] == prev + 1))   # unpaired
+        end
+        set_unknowns!(b, v)
+        d = decompose(b)
+        @test iswelldetermined(d)
+        @test length(subsystems(d)) == n
+        @test largest_subsystem(d) == 1
+        @test [only(names_of(s)) for s in subsystems(d)] == ["v[$i]" for i in 1:n]
+    end
+
+    @testset "the epoch stamp is not confused between searches" begin
+        # `seen` is reused across augmenting searches and distinguished by an epoch counter rather
+        # than being cleared. If the stamp leaked between searches, a later one would treat columns
+        # as already visited and the matching would come out short.
+        n = 30
+        m = Model()
+        @variable(m, x[1:n])
+        @variable(m, c)
+        b = Block(m)
+        # Every equation touches two unknowns, so the search genuinely has to explore and backtrack.
+        for i in 1:n
+            j = i == n ? 1 : i + 1
+            add_constraint!(b, @build_constraint(x[i] + 2 * x[j] == c))
+        end
+        set_unknowns!(b, x)
+        d = decompose(b)
+        @test iswelldetermined(d)
+        @test sum(length(s) for s in subsystems(d)) == n
+    end
+
     @testset "the result is deterministic" begin
         # The expression walkers hand back a Set, whose iteration order is not stable across
         # constructions. Anything built from one has to be sorted before it is used.

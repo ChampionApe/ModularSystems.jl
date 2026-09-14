@@ -481,6 +481,125 @@ the primitive first.
 Applying it twice is harmless: a constraint already carrying its residual is skipped, checked by
 looking for the residual in the constraint rather than by a flag that could drift.
 
+### Solve settings are a value
+
+*Decided 2026-09-14 — `notes/TODO.md` C15.*
+
+[`SolveOptions`](@ref) holds what had been nine keyword arguments retyped at every call site. Every
+field is still accepted as a keyword of [`solve!`](@ref) and overrides the options passed alongside
+it, so nothing that worked before means something different now.
+
+Two lines fall out of having drawn it, and both are the useful part.
+
+*Settings, not data.* Starting values are a `Dataset` and stayed a keyword rather than becoming a
+field, because a `SolveOptions` that named a dataset would be tied to one model. As it stands one set
+of options is reusable across models and scenarios, which is what makes naming a set worth doing.
+
+*The optimizer became a per-solve setting rather than model state.* It had been stored in
+`model.ext`, and passing `optimizer = X` to a solve attached `X` to the model as a side effect. A
+calibration and the baseline it feeds could not then use different solvers, or the same solver at
+different attributes, without mutating something shared. `set_optimizer_factory!` remains, as the
+model's default.
+
+### The pairing is also a matching
+
+*Decided 2026-09-14 — `notes/TODO.md` C14.*
+
+The pairing was recorded above as documentation plus a precondition, and that stands. What was
+missed is that structurally it is also a **perfect matching on the equation–variable incidence
+graph**, which is the input to a Dulmage–Mendelsohn decomposition. The information was already
+there; [`decompose`](@ref) only reads it.
+
+Orienting the graph by the matching and running Tarjan gives the smallest subsystems that must be
+solved simultaneously, in an order where each one's inputs are already known. Where the pairings are
+missing or do not cover the unknowns, a maximum matching is computed instead and the coarse
+decomposition names the over- and under-determined parts.
+
+**Kept for diagnosis, and it pays for itself there.** A count cannot distinguish a sound system from
+a structurally singular one. A block with two equations determining the same variable and a third
+variable determined by nothing has `degrees_of_freedom == 0`; `decompose` names all three. So
+`diagnose` now reports `contested` equations and `undetermined` unknowns, kept separate from
+`orphans` because "appears in no equation at all" and "appears, but every equation that could
+determine it is determining something else" are different bugs with different fixes. The
+decomposition costs 2–9 µs per unknown — about three orders of magnitude less than solving — so
+this is free.
+
+**Not kept as a speed optimisation, and that was measured rather than assumed.**
+`BlockTriangular` is 2× to 110× *slower* than solving monolithically, at every size where both work.
+The reason is specific: Ipopt's summed solve time over 400 one- and two-variable subsystems was
+0.990 s against 0.004 s for the same system solved at once — 250× worse. An interior-point solver
+has a setup cost that is independent of problem size, and a scalar subsystem cannot amortise it.
+Building 400 JuMP models, at 1.83 ms each, is the *smaller* half of the overhead. The speedups
+reported for block-triangular form elsewhere assume each subsystem is solved by a direct method, not
+by re-entering a general-purpose NLP code.
+
+The strategy is kept anyway, on a different claim: over 70 combinations of model shape and starting
+point, the monolithic solve converged 58 times and the block-triangular one 62, with five cases it
+alone solved against one it alone missed. Each subsystem starts from the results of the ones before
+it, where the monolithic solve gets whatever the user supplied for everything at once. So it is
+documented as a convergence fallback and not as an optimisation, which is the opposite of what was
+expected when it was written.
+
+The gap does narrow with size — 12.3× at 2,150 unknowns, 1.8× at 21,500 — but no crossover was
+reached, because the block-triangular path became unreliable at 43,000 unknowns before the
+monolithic one did. Tables, and the arithmetic showing that a scalar fast path alone would not close
+the gap, are in `archive/decompositionMeasurements.md`.
+
+**`BlockTriangular` refuses a block with a solved inequality**, rather than solving it. An inequality
+determines nothing, so it belongs to no subsystem, so nothing would ever add it to a model — and the
+solve would return the answer to a different problem while reporting success. Review found this
+producing the wrong root of `x² = 9` under `x ≤ 0`. Deciding which subsystem an inequality should
+ride along with has no correct answer in general, so refusing is the only honest option, and it is
+pinned by a test. The decomposition itself is right to ignore inequalities; the refusal belongs on
+the solve path.
+
+`Graphs.jl` is a dependency for this. Tarjan is short enough to write, and its recursive form
+overflows the stack on exactly the long chains this feature exists for; the established
+implementation is iterative. Call `strongly_connected_components_tarjan` and not the exported
+`strongly_connected_components`: the two are the same function today, but the exported name's
+docstring states that the order of the components is *not* part of its API contract, and that order
+is the entire basis of the solve order. Only the Tarjan name promises it.
+
+### A named configuration, and what it is allowed to promise
+
+*Decided 2026-09-14 — `notes/TODO.md` C16.*
+
+Nothing in the package said which pairings of block and dataset were meaningful. `solve(block, data)`
+accepts all of them, so four blocks and five scenarios is twenty calls of which perhaps five mean
+anything, and the package had no opinion about which five.
+
+A [`Problem`](@ref) is one of the five: a block, the data it is solved against, where it starts and
+how it is solved. A [`ModelSpec`](@ref) is the set of them, in registration order.
+
+**The construction check is on the block, not on the data.** A block is a value and cannot change
+underneath the problem, so a structural guarantee made about it holds. A `Dataset` is mutable by
+design — a scenario *is* a dataset that gets edited — so a data-dependent guarantee made at
+construction would be stale exactly when it mattered. Missing data is caught at solve time, where it
+is still exact. [`assert_solvable`](@ref) takes an optional dataset and draws the same line.
+
+That split turned out to be worth more than the type. `diagnose(spec)` reports that `:baseline` is
+not ready to run because the parameter it needs is what `:calibration` produces — the ordering
+constraint of the whole workflow, visible without running anything and without anyone having
+declared it.
+
+**Which is why there is no dependency graph.** An experiment inferred the edges from datasets being
+the same object, and `examples/multiModeModel.jl` showed why that cannot work here: `solve` is
+non-mutating and returns a *fresh* dataset, so the package's own idiom breaks the identity link the
+inference needs. The alternative, declaring the edges, was rejected for a better reason than
+difficulty: a declared graph is a second statement of the ordering that can drift from the equations,
+whereas readiness is derived from the actual state of the data and cannot. A declaration says what
+should be true; the readiness check says what is.
+
+**No accessors are exported for a `Problem`'s fields.** `data` and `options` are names a user will
+want for their own variables, and an exported function turns that assignment into an error rather
+than a shadow — the same cost recorded as `notes/crossCuttingFindings.md` #2. The fields are public
+and read directly.
+
+**Modes are values; there is no current mode.** Nothing holds a "the model is now in calibration
+state" flag. That would cut against every other decision here — `swap`, `endogenize` and `solve` are
+all non-mutating — and it is the thing that makes a script's behaviour depend on lines that ran
+earlier somewhere else.
+
 ## Open
 
 **Whether slices return views** (C12) and **a sparse notation layer** (C13) are both deferred

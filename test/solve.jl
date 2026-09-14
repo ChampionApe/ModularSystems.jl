@@ -359,6 +359,52 @@
         @test occursin("y", sprint(showerror, e))
     end
 
+    @testset "a solved inequality makes a block-triangular solve refuse" begin
+        # An inequality determines nothing, so it belongs to no subsystem, so nothing would add it
+        # to any model. Before this was caught, the two strategies returned DIFFERENT ROOTS: the
+        # inequality picks x = -3, and the block-triangular path dropped it and returned +3 while
+        # reporting success. A wrong answer delivered quietly is the thing this package is most
+        # careful about, so the refusal is pinned here.
+        m = Model()
+        set_optimizer_factory!(m, optimizer_with_attributes(Ipopt.Optimizer, "sb" => "yes"))
+        @variable(m, x)
+        b = Block(m)
+        add_constraint!(b, @build_constraint(x * x == 9), determines = x)
+        add_constraint!(b, @build_constraint(x <= 0))
+        set_unknowns!(b, x)
+        d = Dataset(m)
+
+        # Monolithically the inequality does its job.
+        @test solve(b, d; replace_nothing = -1.0)[x] ≈ -3.0
+
+        e = try
+            solve(b, d; replace_nothing = -1.0, strategy = BlockTriangular())
+        catch err
+            err
+        end
+        @test e isa ArgumentError
+        @test occursin("inequality", e.msg)
+        @test occursin("different problem", e.msg)
+
+        # The decomposition itself is right to ignore it — the refusal belongs on the solve path.
+        @test iswelldetermined(decompose(b))
+    end
+
+    @testset "an interrupt is not reported as a subsystem failure" begin
+        # Wrapping InterruptException would report Ctrl-C mid-solve as a numerical problem. The
+        # factory throwing it stands in for the user pressing the key inside the solve.
+        m = Model()
+        set_optimizer_factory!(m, () -> throw(InterruptException()))
+        @variable(m, x)
+        b = @block m begin
+            @square
+            x, x == 1
+        end
+        d = Dataset(m)
+        @test_throws InterruptException solve(b, d; replace_nothing = 1.0,
+                                              strategy = BlockTriangular())
+    end
+
     @testset "an objective cannot be solved by subsystems" begin
         m = Model()
         set_optimizer_factory!(m, optimizer_with_attributes(Ipopt.Optimizer, "sb" => "yes"))

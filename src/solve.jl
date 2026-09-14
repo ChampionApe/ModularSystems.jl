@@ -267,25 +267,45 @@ end
 # written into. The cascade needs no mechanism of its own.
 function _subblock(b::Block, s::SubSystem)
     cons = b.constraints[s.constraints]
-    vars = Set(s.variables)
-    paired = Set{VariableRef}(
-        c.determines for c in cons if is_paired(c) && c.determines in vars)
+    # Every pairing the constraints actually carry, not only those the decomposition agrees with:
+    # `paired` is documented as the set of claimed pairings and `add_constraint!` relies on it for
+    # duplicate detection, so filtering it would leave a block whose `paired` disagrees with its own
+    # `pairings`. The matching and the declared pairing *can* differ — `false` for squareness below
+    # is what covers that — but that is no reason for the block to misreport itself.
+    paired = Set{VariableRef}(c.determines for c in cons if is_paired(c))
     return Block(b.model, cons, paired, VariableGroup(b.model, s.variables), nothing, false)
 end
 
 function _run(::BlockTriangular, b::Block, d::Dataset, o::SolveOptions, start_values)
+    # A solved inequality determines nothing, so it belongs to no subsystem, so nothing would ever
+    # add it to a model — and the solve would quietly return the answer to a different problem.
+    # Refusing is the only honest option: the alternative, deciding which subsystem an inequality
+    # should ride along with, has no correct answer in general.
+    ineq = count(c -> is_solved(c) && !is_equality(c), b.constraints)
+    ineq == 0 || throw(ArgumentError(
+        "cannot solve this block one subsystem at a time: it has $ineq solved inequality " *
+        (ineq == 1 ? "constraint, which determines" : "constraints, which determine") *
+        " nothing and so belong to no subsystem. Solving by subsystem would drop " *
+        (ineq == 1 ? "it" : "them") * " and return the answer to a different problem; solve " *
+        "monolithically instead."))
+
     dec = decompose(b)
     iswelldetermined(dec) || throw(ArgumentError(
         "cannot solve this block one subsystem at a time: " * _deficiency_message(dec) *
         ". Use diagnose to see the whole picture, or solve it monolithically."))
 
     total = 0.0
-    status = nothing
+    # A block with nothing to solve is vacuously optimal. Leaving this `nothing` would make an empty
+    # block report a different status depending on the strategy, for no reason.
+    status = MOI.OPTIMAL
     n = length(subsystems(dec))
     for (k, s) in enumerate(subsystems(dec))
         sm = try
             _run_one!(_subblock(b, s), d, o, start_values)
         catch err
+            # An interrupt is the user, not the subsystem. Wrapping it would report Ctrl-C as a
+            # numerical failure.
+            err isa InterruptException && rethrow()
             err isa Exception || rethrow()
             throw(SubSystemFailure(k, n, s.variables, err))
         end

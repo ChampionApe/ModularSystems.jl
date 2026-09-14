@@ -9,7 +9,12 @@
 # and the Dulmage-Mendelsohn coarse decomposition names the over- and under-determined parts. That is
 # what turns "degrees of freedom: 3" into three variables and the equations they are missing from.
 
-using Graphs: SimpleDiGraph, strongly_connected_components, add_edge!
+# `strongly_connected_components_tarjan` rather than the exported `strongly_connected_components`.
+# The two are the same function today, but the exported name's docstring says in terms that the order
+# of the components is *not* part of its API contract, while Tarjan's promises reverse-topological
+# order — which is the whole basis of the solve order below. Depending on the promised one turns an
+# accident into a contract.
+using Graphs: SimpleDiGraph, strongly_connected_components_tarjan, add_edge!
 
 """
     SubSystem
@@ -147,17 +152,21 @@ end
 # One augmenting path by breadth-first search. Deliberately iterative: the recursive form of Kuhn's
 # algorithm recurses once per matched edge along the path, and the models this decomposition exists
 # for are exactly the ones long enough to overflow the stack.
-function _augment!(row_match, col_match, rows, start, seen, came_from)
-    fill!(seen, false)
-    fill!(came_from, 0)
+#
+# `seen` is an epoch stamp rather than a flag vector, and that is not a micro-optimisation. Clearing
+# it per call costs O(columns) whether the search touches two columns or all of them, which makes the
+# whole matching pass quadratic: measured at 14.1 s for an unmatched chain of 200,000, against
+# 0.033 s stamped. `came_from` needs no clearing at all, since it is only read for columns this
+# call has stamped.
+function _augment!(row_match, col_match, rows, start, seen, came_from, epoch)
     queue = [start]
     head = 1
     while head <= length(queue)
         i = queue[head]
         head += 1
         for j in rows[i]
-            seen[j] && continue
-            seen[j] = true
+            seen[j] == epoch && continue
+            seen[j] = epoch
             came_from[j] = i
             if col_match[j] == 0
                 # Walk the path back, re-matching each row to the column that reached it and freeing
@@ -195,11 +204,13 @@ function _matching(b::Block, pos, conidx, rows, nvars)
         col_match[j] = i
     end
 
-    seen = Vector{Bool}(undef, nvars)
+    seen = zeros(Int, nvars)        # epoch stamps; 0 is "never seen", and no epoch is ever 0
     came_from = Vector{Int}(undef, nvars)
+    epoch = 0
     for i in 1:nrows
         row_match[i] == 0 || continue
-        _augment!(row_match, col_match, rows, i, seen, came_from)
+        epoch += 1
+        _augment!(row_match, col_match, rows, i, seen, came_from, epoch)
     end
     return row_match, col_match
 end
@@ -354,7 +365,7 @@ function _order(core, rows, col_match, row_match, unk, conidx)
         end
     end
     out = SubSystem[]
-    for comp in strongly_connected_components(g)
+    for comp in strongly_connected_components_tarjan(g)
         eqs = sort!([core[k] for k in comp])
         push!(out, SubSystem(
             [conidx[i] for i in eqs],

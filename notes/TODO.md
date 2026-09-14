@@ -116,6 +116,36 @@ large surface to add on a guess. Reopen when a measurement shows slice access is
 is worth a wrapper array is ergonomics, and better judged against two or three real models. The C10
 constraints keep it addable as a package extension.
 
+**C14. ~~Decide whether the pairing should drive a decomposition.~~** Closed 2026-09-14: yes for
+diagnosis, no for speed. The pairing is a perfect matching, so `decompose` gets the
+Dulmage–Mendelsohn split for the cost of reading it; `diagnose` now names contested equations and
+undetermined unknowns, which a degrees-of-freedom count cannot see. `BlockTriangular` is kept as a
+**convergence fallback and not an optimisation** — measured at 2× to 110× slower, because entering an
+interior-point solver costs more than a scalar subsystem can amortise. Reasoning in
+`docs/src/design.md`, tables in `archive/decompositionMeasurements.md`.
+
+**C15. ~~Make the solve settings a value.~~** Closed 2026-09-14: `SolveOptions`, with every field
+still accepted as a keyword override. The optimizer became a per-solve setting rather than model
+state. Reasoning in `docs/src/design.md`.
+
+**C16. ~~Decide how the states a model can be solved in are named and held.~~** Closed 2026-09-14:
+`Problem` for one checked configuration, `ModelSpec` for the set. The construction check is on the
+block, never on the data; readiness against the data replaces a dependency graph, and an inferred one
+was tried and rejected with the reason recorded. Reasoning in `docs/src/design.md`.
+
+**C17. Decide whether small subsystems should avoid the solver entirely.** Open. A scalar subsystem
+that is affine in its unknown after substitution has a closed-form answer, and three of every four
+subsystems in the measured model are scalar. This is the only route by which `BlockTriangular` could
+become a speed win rather than a convergence one. It does **not** obviously pay: the arithmetic in
+`archive/decompositionMeasurements.md` §5 shows that removing the scalar solves alone still leaves
+the block-triangular path an order of magnitude behind on the model measured. Reopen with a model
+large enough to reach the region where the two were converging (past ~21,500 unknowns), not before.
+
+**C18. Find out why `BlockTriangular` fails at 43,000 unknowns when monolithic does not.** Open, and
+it blocks C17 and the crossover question: the measurement in
+`archive/decompositionMeasurements.md` §3 stops exactly where it was getting interesting. A
+`SubSystemFailure` names the subsystem, so this should be tractable.
+
 ## Documentation
 
 **D1. ~~Fill in the manual.~~** Closed 2026-09-14: `docs/src/index.md` has a doctested quickstart,

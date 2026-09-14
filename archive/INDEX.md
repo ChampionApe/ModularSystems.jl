@@ -24,3 +24,10 @@ Archive by `git mv`, so the history follows the file.
 - `sparseDeclarationBenchmark.jl` — the measurement behind the C10 decision that sparsity is handled
   by coordinate axes rather than a custom array type. Cited from `docs/src/design.md`. Frozen
   2026-09-14.
+- `decompositionMeasurements.md` — the evidence behind C14: block-triangular solving is 2× to 110×
+  *slower* than monolithic, because entering an interior-point solver has a fixed cost a
+  one-variable subsystem cannot amortise; it converges from slightly more starting points; and the
+  decomposition itself costs microseconds per unknown, which is what makes it worth having as a
+  diagnostic. Cited from `docs/src/design.md`. Frozen 2026-09-14.
+- `decompositionBenchmark.jl`, `robustnessSweep.jl` — the scripts behind that file, so its tables can
+  be rerun rather than believed. Frozen 2026-09-14.
