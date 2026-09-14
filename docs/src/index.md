@@ -495,6 +495,40 @@ working with is a variable in your own code, not hidden state in the model.
 `examples/multiModeModel.jl` runs the whole story end to end — two calibrations, linked and unlinked
 baselines, and a shock — on a two-sector model with an energy satellite.
 
+### Modes over several axes
+
+A registry suits a handful of named modes. Real models often have a *product* instead: static or
+dynamic closure, times calibration or baseline, times linked or unlinked — eight states from six
+ingredients, and writing eight assemblies by hand repeats every ingredient several times.
+
+This needs nothing from the package. A mode is a `Block -> Block` function, and functions already
+compose:
+
+```jldoctest quickstart
+julia> add_wages(b) = b + wages;
+
+julia> to_calibration(b) = swap(b, rho => L);
+
+julia> for stage in (identity, to_calibration), extra in (identity, add_wages)
+           b = (stage ∘ extra)(labour)
+           println(length(b), " constraints, ", length(unknowns(b)), " unknowns")
+       end
+2 constraints, 2 unknowns
+4 constraints, 4 unknowns
+2 constraints, 2 unknowns
+4 constraints, 4 unknowns
+```
+
+`identity` is the "leave this axis alone" option, so every axis has the same shape. Registering the
+whole product is then a loop over the axes, and the readiness column makes the resulting matrix
+legible — which modes are runnable now, and which are waiting on a calibration.
+
+Two things make this safer than it looks. Where a `swap` and a `+` both apply, they **commute**: the
+swap re-points one constraint and the sum unions the unknowns, so composing in either order gives the
+same block, constraint for constraint and pairing for pairing. And where they cannot commute —
+calibrating against an equation that the blocks composed so far do not contain — `swap` raises and
+names the variable, rather than building something subtly different.
+
 ## Soft-linking separate models
 
 Sometimes two models cannot be made one. A macro model and a bottom-up energy model are maintained by

@@ -158,14 +158,11 @@ was the loop, because every individual solve in a diverging link succeeds and re
 loop that runs out of passes and returns its last values is a wrong answer with no symptom.
 `fixed_point!` raises. Reasoning in `docs/src/design.md`.
 
-**C20. Composable modes across orthogonal axes.** Open. RKB chose "start enumerable, allow
-composition"; only the enumerable half is built. The registry handles a handful of named modes well,
-but a model whose states are a *product* — {static, dynamic} × {calibration, baseline} × {linked,
-unlinked} — would need eight registrations of six ingredients. `examples/multiModeModel.jl` is at
-exactly the size where this starts to show: it builds six block variables by hand to make five modes.
-The candidate is a mode as a composable transformation (block selection, endo/exo change, options
-overlay) rather than a finished `Problem`. Not obviously worth it — judge it against a model with
-more than one orthogonal axis, which the current example does not have.
+**C20. ~~Composable modes across orthogonal axes.~~** Closed 2026-09-14: nothing to build. A mode is
+a `Block -> Block` function and functions already compose, so a three-axis product is a loop with
+`identity` as each axis's no-op — measured at eight modes from six ingredients in five lines. `swap`
+and `+` commute where both apply, and `swap` raises where they cannot, both checked. Reasoning in
+`docs/src/design.md`; the idiom is in the manual under *Modes over several axes*.
 
 **C21. Index-restricted modes.** Open. "Solve periods 1–10 only", or one region of a multi-region
 model, is a real modelling need with no answer in the package. `examples/multiModeModel.jl` sidesteps

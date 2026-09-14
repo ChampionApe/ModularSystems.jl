@@ -649,6 +649,31 @@ that walks away in one direction is miscoupled rather than under-damped. Both ca
 tests, the second precisely because a user will otherwise reach for damping and conclude the package
 is at fault.
 
+### Composing modes is function composition
+
+*Decided 2026-09-14 — `notes/TODO.md` C20.*
+
+The registry holds a handful of named modes well. A model whose states are a *product* — static or
+dynamic closure, times calibration or baseline, times linked or unlinked — would need eight
+registrations repeating six ingredients between them, which is where a registry of finished
+`Problem`s stops paying.
+
+It needs nothing. A mode is a `Block -> Block` function and functions already compose, so the eight
+states are a loop over three axes with `identity` as each axis's "leave it alone" option. Measured on
+the example model: eight modes from six ingredients in five lines, with `ready` reporting which of
+them the data can support yet.
+
+A `Mode` type carrying a block transformation, a data transformation and an options overlay was
+considered. It would wrap `∘` in a name, and it would have to decide an application order that
+Julia's own composition already fixes. The registry stays a registry of `Problem`s; what varies is
+how the `Problem` was built, which is the caller's business.
+
+Two properties make the idiom safe enough to recommend, both checked rather than assumed. Where a
+`swap` and a `+` both apply they **commute** — the swap re-points one constraint, the sum unions the
+unknowns — so composing in either order gives the same block, constraint for constraint and pairing
+for pairing. And where they cannot commute, because the equation being re-pointed is in a block not
+yet added, `swap` raises and names the variable rather than silently building something adjacent.
+
 ## Open
 
 **Whether slices return views** (C12) and **a sparse notation layer** (C13) are both deferred
