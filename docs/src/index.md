@@ -1,7 +1,9 @@
 # ModularSystems.jl
 
-A Julia package for **modular square systems of equations**: equation blocks paired to the
-endogenous variables they determine, composed into a model, and solved.
+A Julia package for **modular systems of equations**: constraints collected into composable blocks,
+each constraint optionally paired with the variable it determines. Square systems — as many equations
+as unknowns — are the common case and get a dedicated solver, but they are not a requirement: a block
+may carry an objective and be solved as an optimization problem instead.
 
 !!! warning "Early days"
     The package is a skeleton. It is built on [JuMP](https://jump.dev), and the rest of the design is
@@ -14,17 +16,24 @@ endogenous variables they determine, composed into a model, and solved.
 julia> using Pkg; Pkg.develop(url = "https://github.com/ChampionApe/ModularSystems.jl")
 ```
 
-## What "square" means here
+## Blocks, pairings and squareness
 
-A square system has as many equations as endogenous variables. Stating the pairing *explicitly* —
-this block of equations determines these variables — buys three things that a flat list of
-constraints does not:
+A **block** is a composable collection of constraints over a JuMP model, together with the set of
+variables being solved for and, optionally, an objective. Blocks are developed, tested and documented
+one at a time, then summed into the system you actually solve.
 
-1. **A dimension check that is local.** A block that is not square is wrong on its own, before the
-   model is assembled, and the error names the block rather than the model.
-2. **Calibration as a swap.** Turning a parameter endogenous and an outcome exogenous is a
-   re-pairing within a block, not a rewrite of the equations.
-3. **Composition.** Blocks can be developed, tested and documented one at a time.
+Each constraint may be **paired** with the variable it is understood to determine. The pairing is
+documentation and a precondition: it names constraints in solver output and diagnostics, and it is
+what the square solver checks before it runs. It does not order the system or drive the solution
+write-back, and in a block with an objective it is inert.
+
+A system is **square** when it has no objective and every solved constraint is an equality paired
+with a distinct variable, together covering the unknowns. That is the common case in macroeconomic
+modelling and it gets a dedicated solve path. It is not a requirement — the number that generalises
+is the degrees of freedom, which is defined either way.
+
+Calibration is then not a special mode: it is the same block with a different partition of variables
+into unknown and fixed.
 
 ## Relation to SquareModels.jl
 

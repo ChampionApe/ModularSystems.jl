@@ -2,19 +2,29 @@
 
 ## Project overview
 
-A Julia package for **modular square systems of equations**: equation blocks paired to the endogenous
-variables they determine, composed into a model, and solved. The deliverable is the package itself
-plus its documentation — there is no paper and no results pipeline here.
+A Julia package for **modular systems of equations**: constraints collected into composable blocks,
+each constraint optionally paired with the variable it determines. Square systems — as many equations
+as unknowns — are the common case and get a dedicated solver, but they are not a requirement: a block
+may carry an objective and be solved as an optimization problem instead.
+
+The deliverable is the package itself plus its documentation — there is no paper and no results
+pipeline here.
 
 The design borrows concepts from [SquareModels.jl](https://github.com/MartinBonde/SquareModels.jl)
 (Martin Bonde) — blocks, endo-exo swapping, a model-level data dictionary — and **no code**. This is
 an independent implementation with different interface preferences. Do not copy from it, and do not
 assume its API decisions carry over; where this package differs, the difference is the point.
 
-**The package is a skeleton.** It is built on **JuMP** — a model's state is a `JuMP.Model`, and
-blocks are a layer over its variables and constraints. Beyond that the design is not settled:
-`docs/src/design.md` records what has been decided and why, `notes/TODO.md` holds the open questions
-(C2, what a block is; C3, how endo-exo swapping works).
+**The package is a skeleton — no implementation yet.** It is built on **JuMP**: a model's state is a
+`JuMP.Model`, and blocks are a layer over its variables and constraints. `docs/src/design.md` records
+what has been decided and why; `notes/TODO.md` holds the open questions. Read both before writing
+code — several decisions are taken and should not be re-litigated, and several are deliberately
+open.
+
+**Squareness is a predicate, not an invariant.** A block does not have to pair every constraint with
+a variable, and a block with an objective is solved as an optimization problem. Anything that assumes
+one-equation-one-variable — residuals, the square solver's precondition, constraint naming — must
+degrade gracefully when the pairing is absent rather than error.
 
 Solver and plotting integrations belong in `ext/` as package extensions with weak dependencies, not
 in `[deps]` — someone who only wants to solve a model should not pay for a plotting stack.
@@ -59,6 +69,16 @@ Julia 1.10.5 locally; `[compat]` declares `julia = "1.10"` and CI tests 1.10 and
 ## Key conventions
 
 - **Language.** Julia. No Python in this repository.
+- **One package. No sibling packages.** Functionality that belongs to this problem lives in this
+  repository. Where a dependency should not be forced on every user — plotting, a solver backend,
+  data I/O — the mechanism is a **package extension in `ext/`**, which is in this repository and
+  loads only when the optional package is present. That is not the same thing as splitting the work
+  across repositories, and the difference matters: extensions keep the dependency light without
+  fragmenting the package.
+- **Priorities, in the order to break ties.** Speed and efficiency; modularity and flexibility; and
+  code that is easy to read, write and adjust while a model is being developed. When two designs are
+  otherwise even, these decide. A design argued only on elegance does not beat one with a
+  measurement behind it.
 - **The API is the product.** An exported symbol is a promise. Prefer exporting less and documenting
   it properly over exporting broadly; anything not exported can change freely. `checkdocs = :exports`
   means an export without a docstring fails the docs build — that is deliberate.

@@ -1,8 +1,14 @@
 # ModularSystems.jl
 
-A Julia package for **modular square systems of equations**: equation blocks paired to the endogenous
-variables they determine, composed into a model, and solved. `CLAUDE.md` holds the working
-conventions; this file is a map.
+[![CI](https://github.com/ChampionApe/ModularSystems.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/ChampionApe/ModularSystems.jl/actions/workflows/CI.yml)
+[![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://championape.github.io/ModularSystems.jl/)
+
+A Julia package for **modular systems of equations**: constraints collected into composable blocks,
+each constraint optionally paired with the variable it determines. Square systems — as many equations
+as unknowns — are the common case and get a dedicated solver, but they are not a requirement: a block
+may carry an objective and be solved as an optimization problem instead.
+
+`CLAUDE.md` holds the working conventions; this file is a map.
 
 **Status: skeleton.** Built on [JuMP](https://jump.dev); beyond that the design is not settled and
 nothing in the API is stable. `docs/src/design.md` has what is decided and why; `notes/TODO.md` is

@@ -21,4 +21,6 @@ Archive by `git mv`, so the history follows the file.
 
 ## Contents
 
-*(Empty.)*
+- `sparseDeclarationBenchmark.jl` — the measurement behind the C10 decision that sparsity is handled
+  by coordinate axes rather than a custom array type. Cited from `docs/src/design.md`. Frozen
+  2026-09-14.
