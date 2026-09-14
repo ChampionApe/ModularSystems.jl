@@ -12,9 +12,11 @@ The first milestone is the narrowest slice that exercises every closed decision 
 variables, build a `Dataset`, construct a square `Block`, solve, write back, read the answer. Nothing
 else. Everything deferred below is additive to it.
 
-**I1. `Dataset` and the model layout.** Variable-id assignment, dense value vector, sparse lower/upper
-maps, `copy`, elementwise arithmetic under the value-only rule. Everything sits on this, and it is
-where the speed priority bites first.
+**I1. ~~`Dataset` and the model layout.~~** Closed 2026-09-14. `src/layout.jl`, `src/dataset.jl`,
+56 tests. Slots come from JuMP's own `MOI.VariableIndex`, so there is no id map — but deletion leaves
+a permanent gap, so storage is sized by the highest slot and never by `num_variables`. A `Dataset` is
+a broadcast scalar, which is what makes `scenario ./ baseline .- 1` one pass and one allocation
+rather than cell-by-cell.
 
 **I2. `VariableGroup`.** Small and self-contained; needed by I4.
 

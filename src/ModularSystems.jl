@@ -5,14 +5,21 @@ Modular square systems of equations: equation blocks paired to the endogenous va
 determine, composed into a model, and solved.
 
 Built on JuMP: a model's state is a `JuMP.Model`, and blocks are a layer over its variables and
-constraints. See `docs/src/design.md` for why, and `notes/TODO.md` (C2, C3) for what is still open.
-Nothing here is load-bearing yet.
+constraints. See `docs/src/design.md` for the decisions behind this and `notes/TODO.md` for what is
+still open.
+
+So far this is [`Dataset`](@ref) and the model layout it sits on; blocks and solving are not written
+yet.
 """
 module ModularSystems
 
 using JuMP
 
+include("layout.jl")
+include("dataset.jl")
+
 export ModularSystemsVersion
+export Dataset, SolveMetadata, set_bounds!, bounds, clear_bounds!
 
 """
     ModularSystemsVersion() -> VersionNumber

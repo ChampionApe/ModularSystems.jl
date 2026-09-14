@@ -10,9 +10,12 @@ may carry an objective and be solved as an optimization problem instead.
 
 `CLAUDE.md` holds the working conventions; this file is a map.
 
-**Status: skeleton.** Built on [JuMP](https://jump.dev); beyond that the design is not settled and
-nothing in the API is stable. `docs/src/design.md` has what is decided and why; `notes/TODO.md` is
-the live list of what is not.
+**Status: early.** `Dataset` — the per-scenario store of values, problem bounds and solve metadata —
+works and is tested. Blocks, the `@block` macro and solving are not written yet. Nothing in the API
+is stable.
+
+`docs/src/design.md` has what is decided and why; `notes/TODO.md` has the open questions and the
+implementation order.
 
 ## Layout
 

@@ -15,11 +15,14 @@ The design borrows concepts from [SquareModels.jl](https://github.com/MartinBond
 an independent implementation with different interface preferences. Do not copy from it, and do not
 assume its API decisions carry over; where this package differs, the difference is the point.
 
-**The package is a skeleton — no implementation yet.** It is built on **JuMP**: a model's state is a
-`JuMP.Model`, and blocks are a layer over its variables and constraints. `docs/src/design.md` records
-what has been decided and why; `notes/TODO.md` holds the open questions. Read both before writing
-code — several decisions are taken and should not be re-litigated, and several are deliberately
-open.
+**The package is early.** It is built on **JuMP**: a model's state is a `JuMP.Model`, and blocks are
+a layer over its variables and constraints. `docs/src/design.md` records what has been decided and
+why; `notes/TODO.md` holds the open questions and the implementation order (I1–I5). Read both before
+writing code — several decisions are taken and should not be re-litigated, and several are
+deliberately open.
+
+What exists: `Dataset` and the model layout (I1). What does not: blocks, the `@block` macro, solving,
+variable groups. Work in the I1–I5 order unless there is a reason not to.
 
 **Squareness is a predicate, not an invariant.** A block does not have to pair every constraint with
 a variable, and a block with an objective is solved as an optimization problem. Anything that assumes
