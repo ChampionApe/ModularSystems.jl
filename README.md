@@ -3,10 +3,11 @@
 [![CI](https://github.com/ChampionApe/ModularSystems.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/ChampionApe/ModularSystems.jl/actions/workflows/CI.yml)
 [![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://championape.github.io/ModularSystems.jl/)
 
-A Julia package for **modular systems of equations**: constraints collected into composable blocks,
-each constraint optionally paired with the variable it determines. Square systems — as many equations
-as unknowns — are the common case and get a dedicated solver, but they are not a requirement: a block
-may carry an objective and be solved as an optimization problem instead.
+Modular framework for building, calibrating and solving economic models in Julia.
+
+Models are assembled from composable **blocks** of constraints. Each constraint may be paired with the
+variable it determines — square systems get a dedicated solver — but a block may equally carry an
+objective and be solved as an optimization problem.
 
 `CLAUDE.md` holds the working conventions; this file is a map.
 
@@ -59,6 +60,6 @@ for everyone else.
 
 ## Relation to SquareModels.jl
 
-[SquareModels.jl](https://github.com/MartinBonde/SquareModels.jl) by Martin Bonde solves the same
-class of problem and is where these ideas come from. This package is an independent implementation
-with different interface preferences: it shares no code, is not a fork, and does not depend on it.
+Very similar to [SquareModels.jl](https://github.com/MartinBonde/SquareModels.jl) at its core, with
+different approaches to inequalities, variable bounds and a number of other things. An independent
+implementation: no shared code, not a fork, and no dependency on it.

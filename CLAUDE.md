@@ -2,18 +2,19 @@
 
 ## Project overview
 
-A Julia package for **modular systems of equations**: constraints collected into composable blocks,
-each constraint optionally paired with the variable it determines. Square systems — as many equations
-as unknowns — are the common case and get a dedicated solver, but they are not a requirement: a block
-may carry an objective and be solved as an optimization problem instead.
+Modular framework for building, calibrating and solving economic models in Julia.
+
+Models are assembled from composable **blocks** of constraints. Each constraint may be paired with the
+variable it determines — square systems get a dedicated solver — but a block may equally carry an
+objective and be solved as an optimization problem.
 
 The deliverable is the package itself plus its documentation — there is no paper and no results
 pipeline here.
 
-The design borrows concepts from [SquareModels.jl](https://github.com/MartinBonde/SquareModels.jl)
-(Martin Bonde) — blocks, endo-exo swapping, a model-level data dictionary — and **no code**. This is
-an independent implementation with different interface preferences. Do not copy from it, and do not
-assume its API decisions carry over; where this package differs, the difference is the point.
+Very similar to [SquareModels.jl](https://github.com/MartinBonde/SquareModels.jl) at its core, with
+different approaches to inequalities, variable bounds and other things. **Do not copy code from it,
+and do not assume its API decisions carry over** — where this package differs, the difference is
+deliberate and recorded in `docs/src/design.md`.
 
 **The package is early.** It is built on **JuMP**: a model's state is a `JuMP.Model`, and blocks are
 a layer over its variables and constraints. `docs/src/design.md` records what has been decided and

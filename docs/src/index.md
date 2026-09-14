@@ -1,13 +1,14 @@
 # ModularSystems.jl
 
-A Julia package for **modular systems of equations**: constraints collected into composable blocks,
-each constraint optionally paired with the variable it determines. Square systems — as many equations
-as unknowns — are the common case and get a dedicated solver, but they are not a requirement: a block
-may carry an objective and be solved as an optimization problem instead.
+Modular framework for building, calibrating and solving economic models in Julia.
+
+Models are assembled from composable **blocks** of constraints. Each constraint may be paired with the
+variable it determines — square systems get a dedicated solver — but a block may equally carry an
+objective and be solved as an optimization problem.
 
 !!! warning "Early days"
-    Square systems solve; the optimization path does not yet. See [Design](@ref) for what has been
-    decided and what has not. Nothing in the API is stable.
+    Everything documented here works, but nothing in the API is stable. See [Design](@ref) for what
+    has been decided and why.
 
 ## Installation
 
@@ -264,9 +265,9 @@ into unknown and fixed.
 
 ## Relation to SquareModels.jl
 
-[SquareModels.jl](https://github.com/MartinBonde/SquareModels.jl) by Martin Bonde solves the same
-class of problem and is where these ideas come from. ModularSystems.jl is an independent
-implementation with different interface preferences; it shares no code and is not a fork.
+Very similar to [SquareModels.jl](https://github.com/MartinBonde/SquareModels.jl) at its core, with
+different approaches to inequalities, variable bounds and a number of other things. An independent
+implementation: no shared code, not a fork, and no dependency on it.
 
 ## Diagnosing a block
 
