@@ -55,19 +55,20 @@ into a degrees-of-freedom mismatch rather than a silent change of problem.
 mutable struct Block
     model::JuMP.AbstractModel
     constraints::Vector{Constraint}
+    paired::Set{VariableRef}     # claimed pairings, for O(1) duplicate detection
     declared_unknowns::Union{Nothing,VariableGroup}
     objective::Union{Nothing,Tuple{MOI.OptimizationSense,Any}}
     assert_square::Bool
 end
 
 Block(model::JuMP.AbstractModel; square::Bool = false) =
-    Block(model, Constraint[], nothing, nothing, square)
+    Block(model, Constraint[], Set{VariableRef}(), nothing, nothing, square)
 
 JuMP.owner_model(b::Block) = b.model
 Base.length(b::Block) = length(b.constraints)
 
 Base.copy(b::Block) = Block(
-    b.model, copy(b.constraints), b.declared_unknowns, b.objective, b.assert_square)
+    b.model, copy(b.constraints), copy(b.paired), b.declared_unknowns, b.objective, b.assert_square)
 
 """
     solved_constraints(b::Block)
@@ -99,13 +100,63 @@ function add_constraint!(b::Block, con::JuMP.AbstractConstraint; determines = no
             "$(JuMP.name(determines)) belongs to a different model than this block"))
         is_equality(c) || throw(ArgumentError(
             "cannot pair $(JuMP.name(determines)) with an inequality: an inequality determines nothing"))
-        for other in b.constraints
-            other.determines === determines && throw(ArgumentError(
-                "$(JuMP.name(determines)) is already determined by another constraint in this block"))
-        end
+        # Set membership rather than a scan of every existing constraint: the scan made building a
+        # block quadratic in its size, which matters once blocks are composed from modules.
+        determines in b.paired && throw(ArgumentError(
+            "$(JuMP.name(determines)) is already determined by another constraint in this block"))
+        push!(b.paired, determines)
     end
     push!(b.constraints, c)
     return b
+end
+
+"""
+    a::Block + b::Block -> Block
+    sum(blocks)
+
+Compose two blocks over the same model. Constraints concatenate and pairings must stay distinct, so a
+variable determined in both blocks is an error rather than a silently dropped equation.
+
+- **Objectives.** At most one across a sum. Two objectives raise rather than being added together:
+  summing objectives contributed by different modules is a wrong answer with no symptom.
+- **Unknowns.** Unioned. If neither block declares a set, the result declares none either and keeps
+  deriving its unknowns from its pairings.
+- **Squareness.** The result is **never** marked square, whatever its parts claimed. Two square blocks
+  can each be square alone and not compose to a square system, so inheriting the claim would skip the
+  check exactly where it is most likely to catch something. Re-assert with [`assert_square!`](@ref).
+"""
+function Base.:+(a::Block, b::Block)
+    a.model === b.model || throw(ArgumentError("blocks belong to different models"))
+    a.objective === nothing || b.objective === nothing || throw(ArgumentError(
+        "both blocks carry an objective; a composed block may have at most one"))
+
+    clash = intersect(a.paired, b.paired)
+    isempty(clash) || throw(ArgumentError(
+        "both blocks determine " * join((JuMP.name(v) for v in clash), ", ") *
+        "; a variable may be determined only once in a composed block"))
+
+    unk = (a.declared_unknowns === nothing && b.declared_unknowns === nothing) ?
+        nothing : unknowns(a) ∪ unknowns(b)
+
+    return Block(
+        a.model,
+        vcat(a.constraints, b.constraints),
+        union(a.paired, b.paired),
+        unk,
+        a.objective === nothing ? b.objective : a.objective,
+        false,
+    )
+end
+
+"""
+    assert_square!(b::Block) -> Block
+
+Mark a block square and check it immediately. This is how a composed block re-asserts squareness,
+which `+` deliberately does not carry over.
+"""
+function assert_square!(b::Block)
+    b.assert_square = true
+    return validate(b)
 end
 
 """

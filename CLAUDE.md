@@ -23,8 +23,8 @@ deliberately open.
 
 What exists: `Dataset` and the model layout, `VariableGroup`, `Block`, the `@block` and `@group`
 macros, and **both solve paths** — square, and optimization for a block carrying an objective — with
-bounds, the binding-bound check and `@check` evaluation. What does not: block composition (C6),
-residuals (C7), swapping (C3), `IndexSet`, tags (I6) and `diagnose`. `notes/TODO.md` has the live
+bounds, the binding-bound check and `@check` evaluation. Blocks compose with `+`. What does not
+exist: residuals (C7), swapping (C3), `IndexSet`, tags (I6) and `diagnose`. `notes/TODO.md` has the live
 list.
 
 **Squareness is a predicate, not an invariant.** A block does not have to pair every constraint with

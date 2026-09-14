@@ -80,6 +80,39 @@
         @test collect(unknowns(b)) == [K[4], K[5]]
     end
 
+    @testset "fixed indices are not loops" begin
+        # `K[t0]` pairs with a single cell. The parser distinguishes a fixed position from an index
+        # specification, so a head may mix them: `x[s in S, :Equity]`.
+        m = testmodel()
+        T = 2020:2024
+        t0 = 2020
+        @variable(m, K[T])
+        b = @block m begin
+            @square
+            K[t0], K[t0] == 100
+            K[t ∈ T; t > t0], K[t] == K[t - 1] * 2
+        end
+        @test length(b) == 5
+        @test collect(unknowns(b))[1] == K[2020]
+
+        d = Dataset(m)
+        out = solve(b, d; replace_nothing = 1.0)
+        @test out[K[2020]] ≈ 100.0
+        @test out[K[2024]] ≈ 1600.0
+    end
+
+    @testset "mixed fixed and looped indices" begin
+        m = testmodel()
+        S, T = [:a, :b], 1:2
+        @variable(m, x[S, [:Equity, :Liab], T])
+        b = @block m begin
+            x[s ∈ S, :Equity, t ∈ T], x[s, :Equity, t] == t
+        end
+        @test length(b) == 4
+        @test all(v -> v in unknowns(b), [x[:a, :Equity, 1], x[:b, :Equity, 2]])
+        @test !(x[:a, :Liab, 1] in unknowns(b))
+    end
+
     @testset "unpaired entries" begin
         m = testmodel()
         @variable(m, x)

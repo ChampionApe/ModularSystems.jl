@@ -12,10 +12,15 @@ for name in (:check, :unknowns, :square)
 end
 
 """
-    _parse_head(head) -> (name, specs, filter)
+    _parse_head(head) -> (name, specs, positions, filter)
 
-Normalise the head of a block entry into the variable it pairs with (`nothing` when unpaired), its
-index specifications as `(name, set)` pairs, and an optional filter.
+Normalise the head of a block entry into the variable it pairs with (`nothing` when unpaired), the
+index specifications to loop over as `(name, set)` pairs, the full index list in source order, and an
+optional filter.
+
+`positions` and `specs` differ because an index need not be a loop: `K[t0]` and `x[s in S, :Equity]`
+fix a position rather than range over it. A fixed position appears in `positions` and not in `specs`,
+so it indexes the variable without generating a loop.
 
 Julia parses these five ways depending on whether a filter is present and how many indices there are
 — `ref`, `vect`, `typed_vcat`, `vcat`, and a `parameters` node for the filter — so every form is
@@ -27,9 +32,9 @@ function _parse_head(head)
     filter = nothing
 
     if head === nothing
-        return (nothing, Tuple{Any,Any}[], nothing)   # a scalar unpaired entry, or a @check
+        return (nothing, Tuple{Any,Any}[], Any[], nothing)   # a scalar unpaired entry, or a @check
     elseif head isa Symbol
-        return (head, Tuple{Any,Any}[], nothing)
+        return (head, Tuple{Any,Any}[], Any[], nothing)
     elseif head isa Expr && head.head === :ref
         name = head.args[1]
         parts = head.args[2:end]
@@ -47,19 +52,22 @@ function _parse_head(head)
     end
 
     specs = Tuple{Any,Any}[]
+    positions = Any[]
     for p in parts
         if p isa Expr && p.head === :parameters
             length(p.args) == 1 || error("only one filter is allowed in `$head`")
             filter = p.args[1]
         elseif p isa Expr && (p.head === :kw || p.head === :(=))
             push!(specs, (p.args[1], p.args[2]))
+            push!(positions, p.args[1])
         elseif p isa Expr && p.head === :call && p.args[1] in (:∈, :in)
             push!(specs, (p.args[2], p.args[3]))
+            push!(positions, p.args[2])
         else
-            error("cannot read `$p` as an index specification; expected `i in I` or `i = I`")
+            push!(positions, p)          # a fixed index: `K[t0]`, `x[:Equity]`, `x[2019]`
         end
     end
-    return (name, specs, filter)
+    return (name, specs, positions, filter)
 end
 
 # Wrap `inner` in one loop per index specification, with the filter as a guard.
@@ -70,11 +78,12 @@ function _wrap_loops(inner, specs, filter)
     return Expr(:for, head, body)
 end
 
-# The paired variable for one iteration: `L` for a scalar entry, `L[j, t]` for an indexed one.
-function _pair_expr(name, specs)
+# The paired variable for one iteration: `L` for a scalar entry, `L[j, t]` for an indexed one, and
+# `K[t0]` where a position is fixed rather than looped.
+function _pair_expr(name, positions)
     name === nothing && return :nothing
-    isempty(specs) && return esc(name)
-    return Expr(:ref, esc(name), (esc(n) for (n, _) in specs)...)
+    isempty(positions) && return esc(name)
+    return Expr(:ref, esc(name), (esc(p) for p in positions)...)
 end
 
 # Build the constraint object directly rather than delegating to `JuMP.@build_constraint`. That macro
@@ -99,9 +108,9 @@ function _constraint_expr(body)
 end
 
 function _emit_constraint(blk, head, body, role, message)
-    name, specs, filter = _parse_head(head)
+    name, specs, positions, filter = _parse_head(head)
     call = if role === :solved
-        :(add_constraint!($blk, $(_constraint_expr(body)); determines = $(_pair_expr(name, specs))))
+        :(add_constraint!($blk, $(_constraint_expr(body)); determines = $(_pair_expr(name, positions))))
     else
         :(add_check!($blk, $(_constraint_expr(body)), $message))
     end
@@ -112,11 +121,11 @@ end
 # item becomes a comprehension over its cells, using the same index syntax as a constraint entry.
 function _unknown_expr(item)
     if item isa Expr && item.head in (:ref, :vect, :typed_vcat, :vcat)
-        name, specs, filter = _parse_head(item)
+        name, specs, positions, filter = _parse_head(item)
         if name !== nothing && !isempty(specs)
             iters = [Expr(:(=), esc(n), esc(s)) for (n, s) in specs]
             inner = filter === nothing ? iters : [Expr(:filter, esc(filter), iters...)]
-            return Expr(:comprehension, Expr(:generator, _pair_expr(name, specs), inner...))
+            return Expr(:comprehension, Expr(:generator, _pair_expr(name, positions), inner...))
         end
     end
     return esc(item)

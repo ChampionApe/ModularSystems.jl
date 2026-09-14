@@ -212,6 +212,7 @@ One macro covers both kinds of system:
 | `x, expr` | constraint paired with `x` |
 | `x[i ∈ I], expr` | indexed, paired with `x[i]` |
 | `[i ∈ I], expr` | indexed, unpaired |
+| `x[t0], expr` | a fixed index — pairs with that one cell, no loop |
 | `expr` | scalar, unpaired |
 | `@check expr "msg"` | role = check; evaluated after a solve, never solved |
 | `@unknowns ...` | declares the unknown set |
@@ -390,14 +391,33 @@ which is what makes its sparse layer non-optional in practice. And the expressio
 tolerate an additive-identity sentinel they do not define, so a notation layer could be added later
 by a package extension rather than a rewrite.
 
+### Composition
+
+*Decided 2026-09-14 — `notes/TODO.md` C6.*
+
+`a + b` concatenates constraints over one model. A variable determined in both blocks raises, so an
+equation cannot be silently dropped.
+
+*At most one objective across a sum.* Two objectives raise rather than being summed: adding
+objectives contributed by different modules is a wrong answer with no symptom.
+
+*Unknowns are unioned.* If neither block declares a set, the result declares none either and keeps
+deriving its unknowns from its pairings, so composing does not freeze a block that was still
+derivable.
+
+*The result is never marked square*, whatever its parts claimed. Two blocks can each be square alone
+and not compose to a square system — they may share a pairing, or one may supply constraints the
+other's unknowns do not cover — so inheriting the claim would skip the check exactly where it is most
+likely to catch something. `assert_square!` re-asserts and checks.
+
+A related change fell out of this: `add_constraint!` checked for a duplicate pairing by scanning
+every existing constraint, making block construction quadratic in its size. Blocks now carry a
+`Set` of claimed pairings, which matters once a model is assembled from modules.
+
 ## Open
 
 **The swap interface** (`notes/TODO.md` C3, narrowed). The semantics are settled; the surface is not — mutating or
 returning a new block, macro or function, and how cells are selected on each side.
-
-**Composition rules** (C6). At most one objective across a sum; paired variables stay distinct;
-unpaired constraints concatenate. Needs stating properly, including what happens to declared
-unknowns and to the square-intent marker.
 
 **Whether residuals stay** (C7). Auto-creating a residual per endogenous variable is a GAMS habit
 that buys real debugging power and doubles the variable count. It is meaningless for an unpaired

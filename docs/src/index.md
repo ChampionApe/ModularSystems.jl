@@ -138,6 +138,42 @@ rather than a requirement of one.
 Pairings are still allowed on a block with an objective; they are simply inert, since the pairing is
 documentation and a square-solver precondition rather than something that orders the system.
 
+## Composing blocks
+
+A block is a unit of model code, and a model is their sum. Each module owns its equations:
+
+```jldoctest quickstart
+julia> labour = @block model begin
+           L[j in J], L[j] == rho[j] * N[j]
+       end;
+
+julia> wages = @block model begin
+           w[j in J], w[j] == L[j] / 100
+       end;
+
+julia> whole = labour + wages;
+
+julia> length(whole)
+4
+
+julia> issquare(whole)
+true
+```
+
+A variable determined in both blocks raises rather than one equation quietly winning, and at most one
+objective may appear across a sum.
+
+A composed block is **never** marked square, whatever its parts claimed — two square blocks need not
+compose to a square system, so inheriting the claim would skip the check where it is most likely to
+catch something. Re-assert explicitly:
+
+```jldoctest quickstart
+julia> whole = assert_square!(whole);
+
+julia> issquare(whole)
+true
+```
+
 ## Bounds
 
 Bounds intrinsic to a variable — `K >= 0` — belong on the JuMP variable. Bounds that belong to *this*

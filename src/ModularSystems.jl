@@ -27,7 +27,7 @@ export ModularSystemsVersion
 export Dataset, SolveMetadata, set_bounds!, bounds, clear_bounds!
 export VariableGroup
 export Block, Constraint, add_constraint!, set_unknowns!, set_objective!
-export unknowns, pairings, issquare, degrees_of_freedom, validate
+export unknowns, pairings, issquare, degrees_of_freedom, validate, assert_square!
 export solved_constraints, checked_constraints
 export solve, solve!, set_optimizer_factory!, BindingBoundError
 export add_check!, assert_checks, CheckFailure
