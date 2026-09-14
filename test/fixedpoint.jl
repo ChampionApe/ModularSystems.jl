@@ -73,7 +73,10 @@
         @test e.report.iterations == 12
         msg = sprint(showerror, e)
         @test occursin("did not settle in 12 passes", msg)
-        @test occursin("growing", msg)         # it should say this is divergence, not slowness
+        # Divergence is diagnosed from the raw magnitudes, not from the change in tolerance units:
+        # a geometrically growing link has a roughly constant relative change.
+        @test occursin("exchanged values grew", msg)
+        @test !occursin("falling", msg)
     end
 
     @testset "raise = false returns the failure instead" begin
@@ -157,4 +160,98 @@
         @test occursin("did NOT converge", sprint(show, r2))
     end
 
+    @testset "damping cannot manufacture convergence" begin
+        # THE regression test. Damping used to be applied before the change was measured, so the
+        # measured change was (1 - damping) * |f(x) - x| and the effective tolerance was
+        # tol / (1 - damping) -- unbounded. At damping = 0.95 a link with multiplier 1.00002, which
+        # grows without bound, reported "converged after 1 pass". The measurement is now taken on the
+        # raw iterate, so no amount of damping can shrink it.
+        #
+        # The multiplier is deliberately just above 1: an obviously explosive link outruns the
+        # (1 - damping) shrink and hides the bug, which is why the original suite missed it.
+        # The map is p -> gain*(10 - p), so the multiplier is -gain: gain = -1.00002 walks away by
+        # 0.002% a pass. Deliberately just above 1, because an obviously explosive link outruns the
+        # (1 - damping) shrink and hides the bug -- which is why the first version of this suite,
+        # whose only expansion case was gain = -2, missed it entirely.
+        for d in (0.0, 0.5, 0.9, 0.95, 0.99)
+            step!, exchanged, _ = pair(-1.00002)
+            r = fixed_point!(step!, exchanged; maxiter = 40, damping = d, raise = false)
+            @test !r.converged
+        end
+    end
+
+    @testset "accuracy does not degrade with damping" begin
+        # The same ordering bug made the answer worse the harder you damped, silently: the reported
+        # change stayed at tolerance while the true distance from the fixed point grew like
+        # 1 / (1 - damping). Every damping level must now land on the same answer.
+        for d in (0.0, 0.5, 0.9, 0.99)
+            step!, exchanged, v = pair(0.5)
+            r = fixed_point!(step!, exchanged; damping = d, maxiter = 20000)
+            @test r.converged
+            @test v.da[v.pa] ≈ 10 / 3 atol = 1e-5
+        end
+    end
+
+    @testset "on success the datasets hold raw values, not a blend" begin
+        # Returning before the blend is what makes this true. A blended answer is one no solve
+        # produced, and the rest of each dataset was solved at the previous value.
+        step!, exchanged, v = pair(0.5)
+        fixed_point!(step!, exchanged; damping = 0.9)
+        # pa is what model B last wrote, and ya is what model A produced from it: they must be
+        # consistent with each other, which a blend would break.
+        @test v.da[v.ya] ≈ 10 - v.da[v.pa] atol = 1e-4
+    end
+
+    @testset "change is measured in multiples of the tolerance" begin
+        # So one number covers cells of any magnitude, and `converged` means change <= 1.
+        step!, exchanged, _ = pair(0.5)
+        r = fixed_point!(step!, exchanged)
+        @test r.change <= 1
+        @test all(h -> h >= 0, r.history)
+        @test occursin("× tolerance", sprint(show, r))
+    end
+
+    @testset "a cell the step never writes is a wiring error, not a convergence one" begin
+        # Naming the wrong cell is the one coupling mistake the loop can catch: a cell it watches but
+        # the step never sets can never converge, and without this it would report Inf forever
+        # without saying why.
+        step!, exchanged, v = pair(0.5)
+        m = JuMP.owner_model(v.pa)
+        @variable(m, untouched)
+        e = try
+            fixed_point!(step!, [v.da => untouched]; maxiter = 3)
+        catch err
+            err
+        end
+        @test e isa ArgumentError
+        @test occursin("nothing in `step!` writes it", e.msg)
+    end
+
+    @testset "argument checks cover maxiter and the tolerances" begin
+        step!, exchanged, _ = pair(0.5)
+        @test_throws ArgumentError fixed_point!(step!, exchanged; maxiter = 0)
+        @test_throws ArgumentError fixed_point!(step!, exchanged; maxiter = -3)
+        @test_throws ArgumentError fixed_point!(step!, exchanged; atol = 0.0)
+        @test_throws ArgumentError fixed_point!(step!, exchanged; rtol = -1.0)
+    end
+
+    @testset "a bare pair and a container are both accepted" begin
+        step!, exchanged, v = pair(0.5)
+        r = fixed_point!(step!, v.da => v.pa)       # not wrapped in a vector
+        @test r.converged
+    end
+
+    @testset "a diverging failure says so even when the first pass had no value" begin
+        # A cell with no value yet records Inf for that pass. Comparing a later change against Inf
+        # would call every failure "falling", so the heuristic looks only at finite entries.
+        # `pb` has no value until the first pass writes it, which is the ordinary case: a price
+        # does not exist before the model that sets it has run.
+        step!, _, v = pair(-2.0)
+        r = fixed_point!(step!, [v.db => v.pb]; maxiter = 10, raise = false)
+        @test !r.converged
+        @test isinf(r.history[1])
+        msg = sprint(showerror, ConvergenceFailure(r, 10))
+        @test occursin("exchanged values grew", msg)
+        @test !occursin("falling", msg)
+    end
 end

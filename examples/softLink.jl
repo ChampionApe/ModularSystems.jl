@@ -117,13 +117,24 @@ exchanged = [macro_data => pe]
 
 energy_demand() = sum(macro_data[E[s]] for s in S)
 
+# How far apart the two models really are. Comparing the macro model's demand with the energy model's
+# total proves nothing: the total was computed from `q`, which was copied from that same demand in
+# the same pass, so the difference is zero by construction whether the link settled or not. The
+# question that is not circular is whether another pass would move anything — solve the macro model
+# at the price it was handed, and see what price comes back.
+function link_residual()
+    before = macro_data[pe]
+    pass!()
+    return abs(macro_data[pe] - before)
+end
+
 println("=== a gently sloped supply curve: the link settles on its own ===")
 report = fixed_point!(pass!, exchanged)
 println(report)
 @printf("  energy price             %10.6f\n", macro_data[pe])
 @printf("  demanded by the macro    %10.6f\n", energy_demand())
 @printf("  supplied by the energy   %10.6f\n", energy_data[total])
-@printf("  the two models disagree by %.3e\n", abs(energy_demand() - energy_data[total]))
+@printf("  one more pass would move the price by %.3e\n", link_residual())
 
 # ---------------------------------------------------------------------------------------------
 # When it does not settle
@@ -155,7 +166,7 @@ macro_data[pe] = 1.0
 damped = fixed_point!(pass!, exchanged; damping = 0.5, maxiter = 200)
 println(damped)
 @printf("  energy price             %10.6f\n", macro_data[pe])
-@printf("  the two models disagree by %.3e\n", abs(energy_demand() - energy_data[total]))
+@printf("  one more pass would move the price by %.3e\n", link_residual())
 
 # A diverging link that is *inspected* rather than trusted: `raise = false` hands back the report so
 # the history can be read. The numbers in the datasets are not a solution and must not be used.
@@ -164,6 +175,10 @@ macro_data[pe] = 1.0
 failed = fixed_point!(pass!, exchanged; maxiter = 6, raise = false)
 println(failed)
 println("  change per pass: ", join((string(round(h, sigdigits = 3)) for h in failed.history), ", "))
-println("  Falling, but by a few percent a pass while still of order one — so this link is not")
-println("  diverging, it is oscillating its way in far too slowly to be left alone. Damping above")
-println("  reached the same fixed point in 6 passes. That distinction is what the history is for.")
+println("  scale per pass:  ", join((string(round(x, sigdigits = 4)) for x in failed.scale), ", "))
+println()
+println("  The change alternates rather than grows, and the scale stays put — so this link is not")
+println("  diverging, it is oscillating its way in far too slowly to be left alone. Damping reached")
+println("  the same fixed point in 6 passes. Telling those two apart is what the report is for, and")
+println("  it needs the scale: in tolerance units a link that grows geometrically looks flat,")
+println("  because the tolerance grows with it.")

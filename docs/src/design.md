@@ -641,6 +641,22 @@ value at the *start* of a pass determines that pass. A quantity that a transfer 
 anything reads it carries no state between passes; damping it would be undone immediately, and
 including it in the convergence test measures something that was going to be overwritten anyway.
 
+**Convergence is judged on the raw iterate, never on the damped blend.** The first implementation
+blended and wrote back before measuring, which made the measured change `(1 - damping)` times the
+real one — so the effective tolerance was `tol / (1 - damping)`, unbounded. Review found it reporting
+*converged after one pass* on a link with multiplier 1.00002 that grows without bound, and found
+accuracy silently degrading like `1 / (1 - damping)` on links that do converge. That is precisely the
+false positive this function exists to prevent, arriving through the keyword meant to make it more
+reliable. The regression test uses a multiplier just above 1 on purpose: an obviously explosive link
+outruns the `(1 - damping)` shrink and hides the bug, which is why the original suite, whose only
+expansion case doubled each pass, missed it.
+
+Two consequences worth keeping. A converging pass returns **before** blending, so the datasets hold
+values the models actually produced rather than a blend no solve ever saw. And the reported change is
+measured in **multiples of the tolerance** rather than in anyone's units, so one number covers cells
+of very different magnitude — with the raw magnitudes recorded separately as `scale`, because in
+tolerance units a geometrically diverging link looks flat: its tolerance grows with it.
+
 **Damping fixes overshoot, not expansion**, and the docstring says so because the distinction is not
 obvious and the failure is silent. If a pass multiplies the error by `m`, damping makes it
 `(1 - damping)·m + damping`. For `m < -1` — the models leapfrogging, the change alternating in sign —

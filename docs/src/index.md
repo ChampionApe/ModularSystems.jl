@@ -583,8 +583,18 @@ anything reads it, so it carries no state and is not what the loop is converging
 `damping` moves each exchanged cell only part of the way to its new value, which is what settles two
 models that overshoot each other. It fixes overshoot and not expansion: if the change alternates in
 sign, damping will help; if the link walks away in one direction, no admissible amount of damping
-brings it back and the coupling itself is wrong. A failure carries its `history`, which tells the two
-apart.
+brings it back and the coupling itself is wrong. A report carries `scale` — the size of the exchanged
+values at each pass — which is what tells those two apart.
+
+Convergence is judged on the **raw** values the models produced, never on the damped blend. Judging
+the blend would scale the measured change by $(1 - \text{damping})$ and so scale the effective
+tolerance by $1/(1 - \text{damping})$, which is unbounded: a heavily damped run would report
+convergence on a link that never settles, which is the one thing this function exists to prevent.
+
+`change` and `history` are in **multiples of the tolerance**, so `1.0` is exactly at tolerance and one
+number is comparable across cells of very different magnitude. `scale` is separate because `history`
+alone cannot distinguish divergence from stagnation — a link growing geometrically has a roughly
+constant *relative* change, since the tolerance grows with the value.
 
 `examples/softLink.jl` shows a link that settles, the same link made steep enough that it will not,
 and damping fixing it.
