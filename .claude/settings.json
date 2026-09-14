@@ -1,0 +1,22 @@
+{
+  "$comment": [
+    "Project settings, committed and shared. Machine- or user-specific permissions belong in",
+    ".claude/settings.local.json, which is gitignored.",
+    "No PYTHONUTF8 here -- that is the Python template's fix and there is no Python in this repo.",
+    "JULIA_NUM_THREADS is left unset on purpose: a benchmark must state its own thread count rather",
+    "than inherit one silently from the session."
+  ],
+  "permissions": {
+    "allow": [
+      "PowerShell(git status:*)",
+      "PowerShell(git diff:*)",
+      "PowerShell(git log:*)",
+      "PowerShell(git show:*)",
+      "PowerShell(julia --project=. -e \"using Pkg; Pkg.test()\")",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(julia --version)"
+    ]
+  }
+}

@@ -1,0 +1,6 @@
+# Normalise to LF in the repository. Developed on Windows, built on Linux in CI: without this, a
+# checked-in CRLF in a workflow file or a shell script fails there and works here.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.pdf binary

@@ -1,0 +1,8 @@
+# The docs environment is separate from the package environment on purpose: Documenter is a build
+# tool, not a dependency of ModularSystems. `docs/make.jl` dev-installs the parent package into it.
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+ModularSystems = "2d7e785c-34a0-4c77-8d27-e41cd38ddb12"
+
+[compat]
+Documenter = "1"

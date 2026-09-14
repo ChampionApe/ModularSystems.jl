@@ -1,0 +1,3 @@
+# Kept out of default searches so a session's first look at the repo sees only live files.
+# Read a path here deliberately, or search with `rg --no-ignore`.
+archive/

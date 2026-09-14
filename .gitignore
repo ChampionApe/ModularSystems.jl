@@ -1,0 +1,28 @@
+# Machine-specific Claude Code permissions. .claude/settings.json IS committed and shared.
+.claude/settings.local.json
+
+# Resolved dependency versions. Gitignored -- the opposite of the research-project template's rule.
+# A package must resolve against whatever its dependents already have, so reproducibility here comes
+# from [compat] in Project.toml, not from a lockfile. See CLAUDE.md.
+Manifest.toml
+/docs/Manifest.toml
+
+# Built documentation. CI builds and deploys the published copy.
+/docs/build/
+/docs/site/
+
+# Detached-run scripts and their output. `logs/*` rather than `logs/`: a bare directory name matches
+# any directory so called anywhere in the tree, and also hides it from ripgrep.
+logs/*
+!logs/README.md
+
+# Julia
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+/deps/deps.jl
+.CondaPkg/
+
+# OS
+Thumbs.db
+.DS_Store

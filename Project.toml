@@ -1,0 +1,17 @@
+name = "ModularSystems"
+uuid = "2d7e785c-34a0-4c77-8d27-e41cd38ddb12"
+authors = ["Rasmus Kehlet Berg <rasmus.kehlet.berg@econ.ku.dk>"]
+version = "0.1.0-DEV"
+
+[deps]
+JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
+
+[compat]
+JuMP = "1"
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
