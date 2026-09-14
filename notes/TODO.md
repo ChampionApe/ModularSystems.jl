@@ -18,21 +18,27 @@ a permanent gap, so storage is sized by the highest slot and never by `num_varia
 a broadcast scalar, which is what makes `scenario ./ baseline .- 1` one pass and one allocation
 rather than cell-by-cell.
 
-**I2. `VariableGroup`.** Small and self-contained; needed by I4.
+**I2. ~~`VariableGroup`.~~** Closed 2026-09-14. `src/group.jl`.
 
-**I3. `Constraint` and `Block` as plain types**, with a programmatic constructor — no macro.
+**I3. ~~`Constraint` and `Block` as plain types.~~** Closed 2026-09-14. `src/block.jl`. Constraints are
+unregistered `JuMP.ScalarConstraint`s, so building a block costs no MOI work.
 
-**I4. `solve` for the square path only.** Substitution, intermediate model, write-back.
+**I4. ~~`solve` for the square path.~~** Closed 2026-09-14. `src/solve.jl`. Includes bound application
+and the binding-bound check, which were listed as deferred — silently ignoring the bounds layer built
+in I1 would have been a wrong-answer hazard.
 
-**I5. `@block`**, as sugar over the tested core.
+**I5. ~~`@block`.~~** Closed 2026-09-14. `src/macro.jl`, plus `@group` sharing its index parser.
+`@check` and its post-solve evaluation came with it, for the same reason as the bounds.
 
-I4 comes before I5 deliberately. A macro over an untested core gives every failure two possible
-causes, and macro errors are the hardest to make good. Building the programmatic API first also
-leaves a non-macro path permanently available, which is what modularity looks like when someone wants
-to assemble blocks in a loop.
+**I6. Implement tags.** `tag!` / `tagged` / `has_tag` and `describe!` / `description`, stored in
+`model.ext` and keyed on `VariableRef`, per the C8 decision. Not needed by the solve path, which is
+why it was not in I1–I5.
 
-Not in the first milestone: the objective path, bound enforcement, `@check`, residuals, swapping,
-`IndexSet`, `diagnose`.
+I4 before I5 was the right call: two macro bugs (a pre-escaped body handed to
+`JuMP.@build_constraint`, and `_parse_head(nothing)`) were easy to localise because everything under
+them was already tested.
+
+Still not implemented: the objective path, residuals, swapping, `IndexSet`, `diagnose`, tags (I6).
 
 ## Code and design
 
@@ -85,7 +91,8 @@ for a `Zero()` sentinel to cover. Two implementation constraints fall out and ar
 `@block` must query containers for stored keys generically, and the expression walkers must tolerate
 an additive-identity sentinel they do not define.
 
-**C11. Name constraints that have no pairing.** `set_name(con, name(endogenous[i]))` is what makes
+**C11. Name constraints that have no pairing.** Provisionally `constraint[n]` in `src/solve.jl`;
+still needs deciding. `set_name(con, name(endogenous[i]))` is what makes
 solver output and diagnostics readable, and it assumes a pairing. Unpaired constraints need a
 fallback scheme. Small, easy to forget, and its absence shows up only when debugging a bad solve.
 Depends on C5.
@@ -103,13 +110,13 @@ Deferred deliberately; the C10 constraints keep it addable as a package extensio
 
 ## Documentation
 
-**D1. Fill in the manual** once there is an implementation: `docs/src/index.md` needs a worked
-example that runs as a doctest, not a description. The `@block` grammar table currently lives in
-`docs/src/design.md`; it is user documentation and moves to the manual once the macro exists, leaving
-only the reasoning behind on the design page.
+**D1. ~~Fill in the manual.~~** Closed 2026-09-14: `docs/src/index.md` has a worked quickstart that
+runs as a doctest. Still to do: move the `@block` grammar table from `docs/src/design.md` to the
+manual, leaving only the reasoning on the design page.
 
-**D2. First example script** in `examples/` — small enough to run in seconds, real enough to show why
-the block abstraction earns its place.
+**D2. ~~First example script.~~** Closed 2026-09-14: `examples/labourMarket.jl` calibrates, solves a
+baseline and runs a scenario, showing that calibration is the same equations with a different unknown
+set.
 
 ## Tests and infrastructure
 

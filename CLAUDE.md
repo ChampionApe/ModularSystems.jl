@@ -21,8 +21,10 @@ why; `notes/TODO.md` holds the open questions and the implementation order (I1�
 writing code — several decisions are taken and should not be re-litigated, and several are
 deliberately open.
 
-What exists: `Dataset` and the model layout (I1). What does not: blocks, the `@block` macro, solving,
-variable groups. Work in the I1–I5 order unless there is a reason not to.
+What exists: `Dataset` and the model layout, `VariableGroup`, `Block`, the `@block` and `@group`
+macros, and the square solve path with bounds, the binding-bound check and `@check` evaluation
+(I1–I5, all closed). What does not: the optimization path, residuals, swapping, `IndexSet`, tags
+(I6) and `diagnose`. `notes/TODO.md` has the live list.
 
 **Squareness is a predicate, not an invariant.** A block does not have to pair every constraint with
 a variable, and a block with an objective is solved as an optimization problem. Anything that assumes
@@ -125,6 +127,9 @@ Things that cost an hour once and would cost it again. All Windows:
 - Documenter shells out to `git rev-parse HEAD`, so `docs/make.jl` fails in a repository with **no
   commits yet** — the error talks about remotes and not about the missing commit. `repo` is pinned
   explicitly in `make.jl`, so a commit is the only thing needed.
-- `Pkg.test()` runs in a *separate* environment built from `[extras]`/`[targets]`. A package that the
-  tests need but the package does not must be added to `[extras]` and listed in `targets.test`, or
-  the suite fails with a bare `ArgumentError: Package X not found` that names no cause.
+- The test environment is `test/Project.toml` (not `[extras]`/`[targets]`), so a test-only
+  dependency such as the solver is added there with `Pkg.add` rather than by hand-copying a UUID.
+  **Never `Pkg.develop` this package into that environment** — `Pkg.test` supplies it itself, and a
+  test environment that already lists it fails with the unhelpful `ERROR: can not merge projects`.
+  To run something from `examples/`, which needs a solver, use the docs environment
+  (`julia --project=docs examples/<name>.jl`) rather than adding to the test one.

@@ -1,5 +1,7 @@
 using ModularSystems
 using JuMP
+using JuMP: MOI
+using Ipopt
 using Test
 
 # One file per source file, each with a @testset named after it — a failure names its own file.
@@ -10,4 +12,8 @@ using Test
 
     include("layout.jl")
     include("dataset.jl")
+    include("group.jl")
+    include("block.jl")
+    include("solve.jl")
+    include("macro.jl")
 end

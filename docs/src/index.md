@@ -6,15 +6,96 @@ as unknowns — are the common case and get a dedicated solver, but they are not
 may carry an objective and be solved as an optimization problem instead.
 
 !!! warning "Early days"
-    The package is a skeleton. It is built on [JuMP](https://jump.dev), and the rest of the design is
-    being settled first — see [Design](@ref) for what has been decided and what has not. Nothing in
-    the API is stable.
+    Square systems solve; the optimization path does not yet. See [Design](@ref) for what has been
+    decided and what has not. Nothing in the API is stable.
 
 ## Installation
 
 ```julia
 julia> using Pkg; Pkg.develop(url = "https://github.com/ChampionApe/ModularSystems.jl")
 ```
+
+You also need a solver. Anything JuMP supports will do; the examples here use Ipopt. (Ipopt prints a
+licence banner from its C library on the first solve, before any verbosity setting applies — the `sb`
+option below is what suppresses it.)
+
+## A first model
+
+Two labour types, each with a productivity and a workforce. Each equation is written next to the
+variable it determines.
+
+```jldoctest quickstart
+julia> using ModularSystems, JuMP, Ipopt
+
+julia> model = Model();
+
+julia> set_optimizer_factory!(model, optimizer_with_attributes(Ipopt.Optimizer, "sb" => "yes"));
+
+julia> J = 1:2;
+
+julia> @variable(model, L[J]);   # labour demand
+
+julia> @variable(model, w[J]);   # wage
+
+julia> @variable(model, N[J]);   # workforce
+
+julia> @variable(model, rho[J]); # productivity
+
+julia> block = @block model begin
+           @square
+           L[j in J], L[j] == rho[j] * N[j]
+           w[j in J], w[j] == L[j] / 100
+       end;
+
+julia> issquare(block)
+true
+
+julia> degrees_of_freedom(block)
+0
+```
+
+`@square` is an assertion: the block claims to be square and is checked as it is built. Drop it and
+nothing is checked — squareness is a property here, not a requirement.
+
+Values live in a [`Dataset`](@ref), one per scenario:
+
+```jldoctest quickstart
+julia> data = Dataset(model);
+
+julia> data[N] = [3200.0, 500.0];
+
+julia> data[rho] = [1.0, 2.0];
+
+julia> baseline = solve(block, data; replace_nothing = 1.0);
+
+julia> round(baseline[L[1]], digits = 2)
+3200.0
+
+julia> round(baseline[w[2]], digits = 2)
+10.0
+```
+
+`solve` returns a new dataset and leaves `data` alone; `solve!` writes in place. Anything the block
+does not solve for — here `N` and `rho` — is substituted from the dataset as a number and never
+reaches the solver.
+
+A scenario is a copy with something changed, and scenarios compare with ordinary arithmetic:
+
+```jldoctest quickstart
+julia> scenario = copy(baseline);
+
+julia> scenario[N] = [2700.0, 1000.0];
+
+julia> scenario = solve(block, scenario; replace_nothing = 1.0);
+
+julia> multipliers = scenario ./ baseline .- 1;
+
+julia> round(multipliers[L[2]], digits = 4)
+1.0
+```
+
+Arithmetic works on values and returns a value-only dataset: bounds and solve metadata are dropped,
+because a ratio of two scenarios is not itself a scenario.
 
 ## Blocks, pairings and squareness
 

@@ -14,12 +14,24 @@ yet.
 module ModularSystems
 
 using JuMP
+const MOI = JuMP.MOI
 
 include("layout.jl")
 include("dataset.jl")
+include("group.jl")
+include("block.jl")
+include("solve.jl")
+include("macro.jl")
 
 export ModularSystemsVersion
 export Dataset, SolveMetadata, set_bounds!, bounds, clear_bounds!
+export VariableGroup
+export Block, Constraint, add_constraint!, set_unknowns!, set_objective!
+export unknowns, pairings, issquare, degrees_of_freedom, validate
+export solved_constraints, checked_constraints
+export solve, solve!, set_optimizer_factory!, BindingBoundError
+export add_check!, assert_checks, CheckFailure
+export @block, @group
 
 """
     ModularSystemsVersion() -> VersionNumber

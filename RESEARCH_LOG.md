@@ -10,6 +10,27 @@ points at it. When this file passes a few hundred lines, move the old entries to
 
 Entries are written at the *end* of a session, not during it.
 
+## 2026-09-14 — Square systems solve end to end
+
+Implemented I1–I5: `Dataset` and the model layout, `VariableGroup`, `Block`, the square solve path,
+and the `@block`/`@group` macros. 186 tests, docs building with a doctested quickstart, and
+`examples/labourMarket.jl` running calibration → baseline → scenario.
+
+Two places the plan was deliberately exceeded, both for the same reason — the alternative was a
+silently wrong answer rather than a missing feature. I4 applies dataset bounds and runs the
+binding-bound check, because the bounds layer built in I1 would otherwise have been accepted and
+ignored. I5 evaluates `@check` constraints, because parsing them and never testing them is worse
+than not having them.
+
+Three bugs worth remembering, all caught by tests written alongside the code: `_ensure!` measured the
+value vector *after* resizing and would have erased every stored value on growth; `VariableGroup`'s
+generated three-field constructor claimed any three-argument call; and `JuMP.@build_constraint`
+cannot take a pre-escaped body, so `@block` builds `ScalarConstraint`s directly. The last is recorded
+in `src/macro.jl` because it is the kind of thing that gets "simplified" back.
+
+Design confirmed by use: keying the solve on the unknown set rather than the pairing means the
+calibration block reuses the behavioural equations unchanged. See `docs/src/design.md`.
+
 ## 2026-09-14 — Repository set up
 
 Created the package skeleton and the working-notes layer, adapting the AI context management from
