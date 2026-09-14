@@ -49,7 +49,7 @@ I4 before I5 was the right call: two macro bugs (a pre-escaped body handed to
 `JuMP.@build_constraint`, and `_parse_head(nothing)`) were easy to localise because everything under
 them was already tested.
 
-Still not implemented: residuals (C7), which is the last open code item.
+Everything on the implementation list is done.
 
 ## Code and design
 
@@ -80,9 +80,9 @@ distinct, at most one objective, unknowns union (and stay derivable if neither p
 the result is never marked square — `assert_square!` re-asserts. Reasoning in `docs/src/design.md`.
 Building a block is no longer quadratic in its size: duplicate pairings are detected with a `Set`.
 
-**C7. Decide whether residuals stay.** Auto-creating a residual per endogenous variable buys real
-debugging power (unfix the residual, fix the endogenous, solve, read the inconsistency) and doubles
-the variable count. Meaningless for an unpaired constraint. At most opt-in and paired-only.
+**C7. ~~Decide whether residuals stay.~~** Closed 2026-09-14: kept, but opt-in via `with_residuals`
+and paired-only — never automatic. The debugging workflow is expressed as a `swap`, so it needed no
+machinery of its own. Reasoning in `docs/src/design.md`.
 
 **C8. ~~Design the variable-group type.~~** Closed 2026-09-14: `VariableGroup`, an ordered set of
 variable cells with a membership set, frozen at construction, no name field, not an `AbstractVector`.

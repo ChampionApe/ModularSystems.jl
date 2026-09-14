@@ -24,8 +24,8 @@ deliberately open.
 What exists: `Dataset` and the model layout, `VariableGroup`, `Block`, the `@block` and `@group`
 macros, and **both solve paths** — square, and optimization for a block carrying an objective — with
 bounds, the binding-bound check and `@check` evaluation. Blocks compose with `+`, and `diagnose` reports a
-system's shape. Tags, `IndexSet` and endo-exo swapping work. What does not
-exist: residuals (C7). `notes/TODO.md` has the live
+system's shape. Tags, `IndexSet`, endo-exo swapping and opt-in residuals
+all work. Every recorded design decision is implemented. `notes/TODO.md` has the live
 list.
 
 **Squareness is a predicate, not an invariant.** A block does not have to pair every constraint with

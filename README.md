@@ -14,7 +14,7 @@ may carry an objective and be solved as an optimization problem instead.
 square solve path and the optimization path are tested end to end — calibration, baseline, scenario
 and minimum-distance estimation. Blocks compose with `+`, and `diagnose` reports a system's shape and its structural problems before
 a solver runs. Tags, `IndexSet`, sparse patterns and endo-exo swapping (`swap` / `endogenize` / `exogenize`) work.
-Not yet written: residuals. Nothing in the API is stable.
+Residuals are available opt-in for locating inconsistent data. Nothing in the API is stable.
 
 `docs/src/design.md` has what is decided and why; `notes/TODO.md` has the open questions and the
 implementation order.

@@ -460,6 +460,27 @@ removing it silently would leave an equation determining something no longer bei
 swap preserves it — one pairing re-pointed, counts unmoved — so a block declared square stays
 declared square and is re-checked.
 
+### Residuals are opt-in and paired-only
+
+*Decided 2026-09-14 — `notes/TODO.md` C7.*
+
+`with_residuals(block, datasets...)` adds a residual variable to every paired solved constraint, added
+to the constraint function so `x == rhs` becomes `x + residual(x) == rhs`. Residuals are exogenous and
+zero, so they change nothing until asked to.
+
+Never created automatically, which is where SquareModels.jl differs: a residual doubles the variable
+count, and most sessions never use one. It is also meaningless for a constraint that determines
+nothing, so unpaired constraints get none.
+
+What they buy is locating inconsistent data, and it is expressed as a [`swap`](@ref) rather than as
+its own mechanism — exogenise the variable at its observed value, make its residual the unknown, and
+solve; the residual reads off how far the data misses the equation. That the debugging workflow falls
+out of the swap primitive rather than needing machinery of its own is the argument for having built
+the primitive first.
+
+Applying it twice is harmless: a constraint already carrying its residual is skipped, checked by
+looking for the residual in the constraint rather than by a flag that could drift.
+
 ## Open
 
 **Whether slices return views** (C12) and **a sparse notation layer** (C13) are both deferred
@@ -468,7 +489,3 @@ measurement showing that slice reads or writes are actually hot — `Window`, `p
 model-layout cache are a large surface to add on a guess. C13 waits for two or three real models: it
 is a pure ergonomics question, whether `x[p, i, t]` with gaps returning zero is worth a wrapper array
 when `x[k, t]` over an `IndexSet` already works.
-
-**Whether residuals stay** (C7). Auto-creating a residual per endogenous variable is a GAMS habit
-that buys real debugging power and doubles the variable count. It is meaningless for an unpaired
-constraint, so at most it is opt-in and paired-only.
