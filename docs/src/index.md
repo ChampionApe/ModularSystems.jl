@@ -217,3 +217,103 @@ into unknown and fixed.
 [SquareModels.jl](https://github.com/MartinBonde/SquareModels.jl) by Martin Bonde solves the same
 class of problem and is where these ideas come from. ModularSystems.jl is an independent
 implementation with different interface preferences; it shares no code and is not a fork.
+
+## Diagnosing a block
+
+`diagnose` reports the shape of a system and its structural problems without running a solver. It
+reports rather than raises: it is meant to be read while a model is being written.
+
+```jldoctest quickstart
+julia> report = diagnose(whole, data);
+
+julia> isclean(report)
+true
+
+julia> report.degrees_of_freedom
+0
+
+julia> report.square
+true
+```
+
+It names three things that would otherwise surface as an unexplained solver failure: constraints left
+with no unknown once exogenous values are substituted, unknowns appearing in no constraint and no
+objective, and exogenous variables with no value. A `@block` entry records where it was written, so
+an unpaired constraint — which has no variable name to be called by — is still identifiable.
+
+## Tags and descriptions
+
+Tags are cross-cutting labels on variable cells, attached after declaration and turned back into a
+group on demand. Nothing shadows `JuMP.@variables`, so every JuMP declaration form keeps working.
+
+```jldoctest quickstart
+julia> const Quantity = Tag(:quantity);
+
+julia> tag!(model, Quantity, L);
+
+julia> length(tagged(model, Quantity))
+2
+
+julia> describe!(model, w, "Wage by labour type");
+
+julia> description(w[1])
+"Wage by labour type"
+```
+
+## Sparse patterns
+
+A sparse variable declared with a filter makes JuMP evaluate the predicate over the full product of
+its axes, which scales with that product rather than with the number of variables created. An
+[`IndexSet`](@ref) is the pattern as a value, and declaring over it is plain JuMP with no scan:
+
+```jldoctest quickstart
+julia> pairs = IndexSet((:p, :i), [(:food, :agri), (:steel, :mfg), (:food, :mfg)]);
+
+julia> @variable(model, use[pairs]);
+
+julia> length(pairs)
+3
+
+julia> collect(select_axes(pairs, :p))
+2-element Vector{Tuple{Symbol}}:
+ (:food,)
+ (:steel,)
+```
+
+A coordinate-keyed container is dense over its own axes, so there are no absent cells to guard.
+Equations iterate the pattern instead of ranging over a product, and `group_by` is what replaces
+summing over one index of a sparse variable:
+
+```jldoctest quickstart
+julia> by_product = group_by(pairs, :p);
+
+julia> length(by_product[(:food,)])
+2
+```
+
+`IndexSet` carries the same `∪`, `∩` and `setdiff` as [`VariableGroup`](@ref) — one is a set of
+coordinates, the other a set of the cells at those coordinates.
+
+## Reference: the `@block` grammar
+
+| Form | Meaning |
+|---|---|
+| `x, expr` | constraint paired with `x` |
+| `x[i in I], expr` | indexed, paired with `x[i]` |
+| `x[t0], expr` | a fixed index — pairs with that one cell, no loop |
+| `[i in I], expr` | indexed, unpaired |
+| `expr` | scalar, unpaired |
+| `@check expr "msg"` | evaluated after a solve, never solved |
+| `@unknowns ...` | declares the unknown set |
+| `@objective Min expr` | attaches an objective |
+| `@square` | asserts squareness, checked as the block is built |
+
+A comma-separated head names the variable a constraint determines; brackets alone give index sets and
+leave the constraint unpaired. A filter goes after `;`, as in `x[t in T; t > t0]`. Fixed and looped
+positions may be mixed: `x[s in S, :Equity, t in T]`.
+
+`@unknowns` is required once any solved constraint is unpaired. That is what turns a dropped variable
+name — `[i in I], ...` where `x[i in I], ...` was meant — into a degrees-of-freedom mismatch rather
+than a silent change of problem.
+
+A pairing on an inequality is an error, since an inequality determines nothing.

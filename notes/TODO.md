@@ -75,9 +75,10 @@ with a variable, `[i ∈ I], expr` is the unpaired indexed form, `@check` takes 
 argument, and `@unknowns` / `@objective` / `@square` are block-level declarations. Table, worked
 examples and reasoning in `docs/src/design.md`.
 
-**C6. State the composition rules** for `+` and `sum`: at most one objective, paired variables stay
-distinct, unpaired constraints concatenate, and what happens to declared unknowns and the
-square-intent marker.
+**C6. ~~State the composition rules.~~** Closed 2026-09-14: constraints concatenate, pairings must stay
+distinct, at most one objective, unknowns union (and stay derivable if neither part declared any), and
+the result is never marked square — `assert_square!` re-asserts. Reasoning in `docs/src/design.md`.
+Building a block is no longer quadratic in its size: duplicate pairings are detected with a `Set`.
 
 **C7. Decide whether residuals stay.** Auto-creating a residual per endogenous variable buys real
 debugging power (unfix the residual, fix the endogenous, solve, read the inconsistency) and doubles
@@ -117,9 +118,9 @@ constraints keep it addable as a package extension.
 
 ## Documentation
 
-**D1. ~~Fill in the manual.~~** Closed 2026-09-14: `docs/src/index.md` has a worked quickstart that
-runs as a doctest. Still to do: move the `@block` grammar table from `docs/src/design.md` to the
-manual, leaving only the reasoning on the design page.
+**D1. ~~Fill in the manual.~~** Closed 2026-09-14: `docs/src/index.md` has a doctested quickstart,
+composition, bounds, the optimization path, and a `Reference` section carrying the `@block` grammar
+table. `docs/src/design.md` keeps only the reasoning.
 
 **D2. ~~First example script.~~** Closed 2026-09-14: `examples/labourMarket.jl` calibrates, solves a
 baseline and runs a scenario, showing that calibration is the same equations with a different unknown
