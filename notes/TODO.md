@@ -44,8 +44,7 @@ I4 before I5 was the right call: two macro bugs (a pre-escaped body handed to
 `JuMP.@build_constraint`, and `_parse_head(nothing)`) were easy to localise because everything under
 them was already tested.
 
-Still not implemented: block composition (C6), residuals (C7), swapping (C3), `IndexSet`,
-`diagnose`, tags (I6).
+Still not implemented: residuals (C7), swapping (C3), `IndexSet`, tags (I6).
 
 ## Code and design
 
@@ -98,11 +97,9 @@ for a `Zero()` sentinel to cover. Two implementation constraints fall out and ar
 `@block` must query containers for stored keys generically, and the expression walkers must tolerate
 an additive-identity sentinel they do not define.
 
-**C11. Name constraints that have no pairing.** Provisionally `constraint[n]` in `src/solve.jl`;
-still needs deciding. `set_name(con, name(endogenous[i]))` is what makes
-solver output and diagnostics readable, and it assumes a pairing. Unpaired constraints need a
-fallback scheme. Small, easy to forget, and its absence shows up only when debugging a bad solve.
-Depends on C5.
+**C11. ~~Name constraints that have no pairing.~~** Closed 2026-09-14: `constraint[n]` by position in
+the solver, plus a `file:line` source recorded by `@block` on every entry, which is what `diagnose`
+and a failed `@check` report. Reasoning in `docs/src/design.md`.
 
 **C12. Decide whether slices return views.** SquareModels' `Window` makes `data[x[2025:2060]]` a view
 that keeps model indices, which is what makes slices usable for printing and plotting, and it brings

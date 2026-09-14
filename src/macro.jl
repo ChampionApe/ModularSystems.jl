@@ -107,15 +107,20 @@ function _constraint_expr(body)
     return :(JuMP.ScalarConstraint($(esc(lhs)) - $(esc(rhs)), $set))
 end
 
-function _emit_constraint(blk, head, body, role, message)
+function _emit_constraint(blk, head, body, role, message, source)
     name, specs, positions, filter = _parse_head(head)
     call = if role === :solved
-        :(add_constraint!($blk, $(_constraint_expr(body)); determines = $(_pair_expr(name, positions))))
+        :(add_constraint!($blk, $(_constraint_expr(body));
+            determines = $(_pair_expr(name, positions)), source = $source))
     else
-        :(add_check!($blk, $(_constraint_expr(body)), $message))
+        :(add_check!($blk, $(_constraint_expr(body)), $message; source = $source))
     end
     return _wrap_loops(call, specs, filter)
 end
+
+# "file:line" for the entry currently being read, so an unpaired constraint can still be pointed at.
+_source_string(ln::LineNumberNode) = string(basename(String(ln.file)), ":", ln.line)
+_source_string(::Nothing) = nothing
 
 # `@unknowns σ, μ[j in J]` — a plain item is passed through for VariableGroup to flatten; an indexed
 # item becomes a comprehension over its cells, using the same index syntax as a constraint entry.
@@ -169,9 +174,14 @@ macro block(target, body)
 
     blk = gensym("block")
     out = Any[:($blk = Block(_block_model($(esc(target)))))]
+    line = nothing
 
     for ex in body.args
-        ex isa LineNumberNode && continue
+        if ex isa LineNumberNode
+            line = ex
+            continue
+        end
+        src = _source_string(line)
 
         if ex isa Expr && ex.head === :macrocall
             mac = ex.args[1]
@@ -192,16 +202,16 @@ macro block(target, body)
             elseif mac === Symbol("@check")
                 isempty(args) && error("@check needs a constraint")
                 msg = length(args) >= 2 ? esc(args[2]) : ""
-                push!(out, _emit_constraint(blk, nothing, args[1], :checked, msg))
+                push!(out, _emit_constraint(blk, nothing, args[1], :checked, msg, src))
             else
                 error("`$mac` is not a @block declaration; expected @square, @unknowns, @objective or @check")
             end
 
         elseif ex isa Expr && ex.head === :tuple && length(ex.args) == 2
-            push!(out, _emit_constraint(blk, ex.args[1], ex.args[2], :solved, ""))
+            push!(out, _emit_constraint(blk, ex.args[1], ex.args[2], :solved, "", src))
 
         else
-            push!(out, _emit_constraint(blk, nothing, ex, :solved, ""))
+            push!(out, _emit_constraint(blk, nothing, ex, :solved, "", src))
         end
     end
 

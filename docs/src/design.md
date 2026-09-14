@@ -414,6 +414,36 @@ A related change fell out of this: `add_constraint!` checked for a duplicate pai
 every existing constraint, making block construction quadratic in its size. Blocks now carry a
 `Set` of claimed pairings, which matters once a model is assembled from modules.
 
+### Naming and identifying constraints
+
+*Decided 2026-09-14 — `notes/TODO.md` C11.*
+
+A paired constraint is named in the solver after the variable it determines. An unpaired one is named
+`constraint[n]` by its position among the solved constraints: a solver name has to be short and
+stable, so it cannot carry much.
+
+What actually identifies an unpaired constraint is **where it was written**. `@block` records a
+`file:line` on each entry it builds, and `diagnose` and a failed `@check` report it. That is the only
+handle an unpaired constraint has, since there is no variable name to call it by. The programmatic
+API records no source, and says so rather than inventing one.
+
+### Diagnosis reports rather than raises
+
+*Decided 2026-09-14.*
+
+`diagnose(block, dataset)` returns the shape of the system — unknowns, equalities, inequalities,
+checks, objective, degrees of freedom, which solve path applies — together with three structural
+problems: constraints containing no unknown (a constant equation once exogenous values are
+substituted), unknowns appearing in no constraint, and exogenous variables with no value.
+
+It reports rather than raises, because a diagnosis is something to read while building a model. The
+useful summary is the *shape*, not a square/not-square verdict, since degrees of freedom is defined
+on both paths.
+
+An orphan means different things on each path, so the test differs: an unknown in no constraint is a
+bug in a square system, but legitimate if it appears in an objective, and a variable in the objective
+is therefore not reported.
+
 ## Open
 
 **The swap interface** (`notes/TODO.md` C3, narrowed). The semantics are settled; the surface is not — mutating or

@@ -18,4 +18,5 @@ using Test
     include("macro.jl")
     include("optimize.jl")
     include("compose.jl")
+    include("diagnose.jl")
 end

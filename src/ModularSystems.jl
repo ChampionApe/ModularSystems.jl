@@ -22,6 +22,7 @@ include("group.jl")
 include("block.jl")
 include("solve.jl")
 include("macro.jl")
+include("diagnose.jl")
 
 export ModularSystemsVersion
 export Dataset, SolveMetadata, set_bounds!, bounds, clear_bounds!
@@ -32,6 +33,7 @@ export solved_constraints, checked_constraints
 export solve, solve!, set_optimizer_factory!, BindingBoundError
 export add_check!, assert_checks, CheckFailure
 export @block, @group
+export diagnose, Diagnosis, isclean, variables_in
 
 """
     ModularSystemsVersion() -> VersionNumber

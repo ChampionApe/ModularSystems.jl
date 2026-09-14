@@ -18,6 +18,9 @@ The function and set are held as an unregistered `JuMP.AbstractConstraint` — b
 `JuMP.@build_constraint`, never added to the model — so a block stays a cheap value that can be
 copied and recombined, and nothing reaches MOI until a solve builds the intermediate model.
 
+`source` records where a `@block` entry was written. It is what makes an unpaired constraint
+identifiable in a diagnosis or a failed check, since there is no variable name to call it by.
+
 `determines` is documentation and a square-solver precondition. It names the constraint in solver
 output and diagnostics and is what squareness is checked against; it does not order the system or
 drive the solution write-back.
@@ -27,6 +30,7 @@ struct Constraint
     determines::Union{Nothing,VariableRef}
     role::ConstraintRole
     message::String
+    source::Union{Nothing,String}    # "file:line" when built by @block, nothing when programmatic
 end
 
 jump_func(c::Constraint) = JuMP.jump_function(c.con)
@@ -93,8 +97,8 @@ b = Block(model)
 add_constraint!(b, @build_constraint(x == a + b), determines = x)
 ```
 """
-function add_constraint!(b::Block, con::JuMP.AbstractConstraint; determines = nothing)
-    c = Constraint(con, determines, SOLVED, "")
+function add_constraint!(b::Block, con::JuMP.AbstractConstraint; determines = nothing, source = nothing)
+    c = Constraint(con, determines, SOLVED, "", source)
     if determines !== nothing
         JuMP.owner_model(determines) === b.model || throw(ArgumentError(
             "$(JuMP.name(determines)) belongs to a different model than this block"))
@@ -168,8 +172,9 @@ Add a constraint that must hold but determines nothing. Checks never enter the s
 A check is not a special form — it is a constraint whose role is `CHECKED` — so it may be an
 equality or an inequality, and it is never paired with a variable.
 """
-function add_check!(b::Block, con::JuMP.AbstractConstraint, message::AbstractString = "")
-    push!(b.constraints, Constraint(con, nothing, CHECKED, String(message)))
+function add_check!(b::Block, con::JuMP.AbstractConstraint, message::AbstractString = "";
+                    source = nothing)
+    push!(b.constraints, Constraint(con, nothing, CHECKED, String(message), source))
     return b
 end
 

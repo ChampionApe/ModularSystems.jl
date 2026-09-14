@@ -148,9 +148,10 @@ function _build_model(b::Block, d::Dataset; start_values, replace_nothing, silen
         n += 1
         func = _substitute(jump_func(c), map, d)
         con = JuMP.@constraint(sm, func in moi_set(c))
-        # Naming a constraint after the variable it determines is what keeps solver output legible.
-        # The fallback for an unpaired constraint is positional and provisional — see notes/TODO.md
-        # C11, which is the decision about what unpaired constraints should actually be called.
+        # A paired constraint is named after the variable it determines, which is what keeps solver
+        # output legible. An unpaired one is named by its position among solved constraints: a solver
+        # name has to be short and stable, so the source location that identifies it lives on the
+        # constraint instead and is reported by `diagnose` and by a failed check.
         JuMP.set_name(con, is_paired(c) ? JuMP.name(c.determines) : "constraint[$n]")
     end
 
@@ -275,12 +276,18 @@ struct CheckFailure <: Exception
     failures::Vector{Tuple{String,Float64}}
 end
 
+# A check with no message is identified by where it was written, which is the only handle an unpaired
+# constraint has.
+_check_label(c::Constraint) =
+    !isempty(c.message) ? c.message :
+    c.source !== nothing ? "check at " * c.source : "(unnamed check)" 
+
 function Base.showerror(io::IO, e::CheckFailure)
     print(io, "CheckFailure: ", length(e.failures),
               length(e.failures) == 1 ? " check did not hold at the solution:" :
                                         " checks did not hold at the solution:")
     for (msg, gap) in e.failures
-        print(io, "\n  ", isempty(msg) ? "(unnamed check)" : msg, " — off by ", gap)
+        print(io, "\n  ", msg, " — off by ", gap)
     end
 end
 
@@ -312,7 +319,7 @@ function assert_checks(b::Block, d::Dataset; atol::Real = 1e-6, rtol::Real = 1e-
     for c in b.constraints
         is_solved(c) && continue
         gap, scale = _check_gap(c, d)
-        gap <= max(atol, rtol * scale) || push!(failures, (c.message, gap))
+        gap <= max(atol, rtol * scale) || push!(failures, (_check_label(c), gap))
     end
     isempty(failures) || throw(CheckFailure(failures))
     return d

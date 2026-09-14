@@ -12,8 +12,8 @@ may carry an objective and be solved as an optimization problem instead.
 
 **Status: both solve paths work.** `Dataset`, `VariableGroup`, `Block`, the `@block` macro, the
 square solve path and the optimization path are tested end to end — calibration, baseline, scenario
-and minimum-distance estimation. Blocks compose with `+`. Not yet written: residuals, endo-exo swapping,
-`IndexSet`, tags and `diagnose`. Nothing in the API is stable.
+and minimum-distance estimation. Blocks compose with `+`, and `diagnose` reports a system's shape and its structural problems before
+a solver runs. Not yet written: residuals, endo-exo swapping, `IndexSet` and tags. Nothing in the API is stable.
 
 `docs/src/design.md` has what is decided and why; `notes/TODO.md` has the open questions and the
 implementation order.
