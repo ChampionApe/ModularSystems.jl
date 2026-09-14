@@ -30,12 +30,23 @@ reading the results of the ones before it out of the dataset.
     problem size, and a one- or two-variable subsystem cannot amortise it: Ipopt's summed solve
     time over 400 tiny subsystems was 0.99 s against 0.004 s for the same system solved at once.
 
-    What it buys is convergence. Each subsystem starts from the results of the ones before it,
-    where a monolithic solve starts from whatever was supplied for everything at once. Over 70
-    combinations of model shape and starting point, this converged 62 times against 58. Reach for
-    it when a solve will not converge, not to make one faster.
+    What it buys is convergence on **short** systems. Each subsystem starts from the results of the
+    ones before it, where a monolithic solve starts from whatever was supplied for everything at
+    once. Over 70 combinations of shape and starting point at 25–50 periods, this converged 62
+    times against 58.
 
-    Tables in `archive/decompositionMeasurements.md`.
+!!! danger "Error accumulates along a long recursive chain"
+    Each subsystem is solved to an **absolute** tolerance and its answer is handed on as exact data,
+    with nothing downstream able to correct it. Where a path passes near zero that absolute residual
+    is a large *relative* error, and it is carried for the rest of the chain. Measured on a
+    700-period recursive model, the worst residual over the whole system was 3.2e-10 here against
+    1.2e-13 monolithic — both acceptable, but 2,700× apart — and at 1,000 periods the accumulated
+    error made a subsystem genuinely infeasible while the monolithic solve converged.
+
+    So: reach for this on a short system that will not converge. Do not reach for it on a long
+    recursive one.
+
+Tables and the diagnosis behind both boxes are in `archive/decompositionMeasurements.md`.
 
 Requires a structurally sound square system. A block with an objective, one whose decomposition has
 an over- or under-determined part, or one carrying a solved **inequality** — which determines nothing

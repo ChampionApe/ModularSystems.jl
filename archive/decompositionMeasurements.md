@@ -98,3 +98,53 @@ large enough to reach the region in §3.
 
 Roughly linear, 2–9 µs per unknown, and about three orders of magnitude cheaper than solving the
 same model. As a diagnostic it is free.
+
+## 7. Why the block-triangular path fails at 43,000 unknowns (C18)
+
+Scripts: `archive/subsystemFailure.jl` and `archive/cascadeDrift.jl`.
+
+At `T = 1000, core = 40` the cascade fails at **subsystem 3136 of 4000** — period 784 of 1000 —
+with `LOCALLY_INFEASIBLE`, while the monolithic solve of the same model converges.
+
+**The first hypothesis was wrong.** The model's forward map near `K = 0` is
+`K[t+1] ≈ (0.9 + 0.02·A[t])·K[t]`, whose gain crosses 1 at `A[t] > 5`, i.e. `t > 400`, so
+amplification by an expansive root looked like the explanation. The measurement refutes it: the
+relative gap against the monolithic answer reaches 4e-4 by `t = 400` *while the gain is still below
+1* (0.94 at t=100, 0.96 at t=200, 0.98 at t=300), and then **plateaus** at 4.4e-4 from t=400 to 700.
+
+**What is actually happening is relative error picked up near zero.** The monolithic path is
+
+| t | 1 | 200 | 400 | 600 | 700 |
+|---|---|---|---|---|---|
+| K | 5.0e+1 | 2.1e-4 | **3.6e-6** | 1.8e-4 | 2.4e-2 |
+
+Capital collapses towards zero around `t = 400` and recovers. A cascade solves each subsystem to an
+**absolute** tolerance and hands the answer to the next one as exact data. At `K ~ 3.6e-6`, an
+absolute residual of ~1e-9 is a relative error of ~1e-3 — and since the dynamics are near-linear in
+`K` there, that relative error is preserved rather than corrected. Hence the plateau: the error is
+locked in at the narrowest point of the path and carried for the rest of it. A monolithic solve does
+not have this exposure, because it enforces every equation jointly and the near-zero stretch is
+pinned from both sides at once.
+
+**A residual check does not catch it**, which is worth knowing before building one. Worst absolute
+residual over every solved constraint, at `T = 700` where both strategies converge:
+
+| | worst absolute residual |
+|---|---|
+| monolithic | 1.16e-13 |
+| block-triangular | 3.17e-10 |
+
+Both satisfy every equation to any reasonable absolute tolerance — so at `T = 700` *both answers are
+correct* and the 4e-4 disagreement is the model being genuinely ill-conditioned there, not either
+strategy being wrong. The cascade is nonetheless **2,700× further out**, and at `T = 1000` that
+margin compounds until a subsystem is infeasible. It fails loudly rather than silently, which is the
+right failure, but it fails.
+
+**What this adds to C14.** `BlockTriangular`'s profile is now specific rather than vague:
+
+- *good for* short systems that are hard to converge — the 62-vs-58 result in §4 is at T = 25–50;
+- *bad for* long recursive chains, where error accumulates with no mechanism to correct it, and
+  worse the closer the path passes to zero;
+- *never* faster.
+
+So it is not a general-purpose alternative, and the docstring says so.

@@ -141,10 +141,22 @@ become a speed win rather than a convergence one. It does **not** obviously pay:
 the block-triangular path an order of magnitude behind on the model measured. Reopen with a model
 large enough to reach the region where the two were converging (past ~21,500 unknowns), not before.
 
-**C18. Find out why `BlockTriangular` fails at 43,000 unknowns when monolithic does not.** Open, and
-it blocks C17 and the crossover question: the measurement in
-`archive/decompositionMeasurements.md` §3 stops exactly where it was getting interesting. A
-`SubSystemFailure` names the subsystem, so this should be tractable.
+**C18. ~~Find out why `BlockTriangular` fails at 43,000 unknowns when monolithic does not.~~**
+Closed 2026-09-14. It is accumulated **relative** error, not an unstable root — the first hypothesis
+was measured and refuted. A cascade solves each subsystem to an absolute tolerance and hands the
+answer on as exact; where the path passes near zero that is a large relative error, carried for the
+rest of the chain with nothing able to correct it. Worst residual 2,700× monolithic at 700 periods,
+infeasible at 1,000. A residual check does **not** catch it, because both answers are valid to
+absolute tolerance. Reasoning and tables in `archive/decompositionMeasurements.md` §7; the
+consequence is in `BlockTriangular`'s docstring.
+
+**C19. Soft-linked models: iterative coupling between separate models.** Open, raised by RKB
+2026-09-14. Two models solved in alternation, each consuming the other's last answer, until the
+exchanged quantities stop moving. The open question is whether this needs any structure at all
+beyond a loop over two `Problem`s plus a convergence test — and if it does, whether that structure
+is a type or a documented workflow. C18 is directly relevant: a soft link that stops after one pass
+is exactly the hand-the-answer-on-as-exact failure, so whatever is built has to make the
+convergence test hard to skip.
 
 ## Documentation
 

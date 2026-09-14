@@ -426,9 +426,15 @@ julia> round(solve(block, data; options = opts, strategy = BlockTriangular())[L[
     amortise that: Ipopt's summed time over 400 tiny subsystems was 0.99 s against 0.004 s for the
     same system solved at once.
 
-    What it buys is **convergence**. Every subsystem starts from the results of the ones before it,
-    where a monolithic solve starts from whatever was supplied for everything at once. Reach for it
-    when a solve will not converge, not to make one faster.
+    What it buys is **convergence on a short system**. Every subsystem starts from the results of
+    the ones before it, where a monolithic solve starts from whatever was supplied for everything
+    at once.
+
+    But each subsystem is solved to an *absolute* tolerance and its answer is handed on as exact,
+    with nothing downstream able to correct it. On a long recursive chain that error accumulates —
+    measured 2,700× worse than monolithic over 700 periods, and outright failure at 1,000. Reach
+    for it on a short system that will not converge; not on a long recursive one, and never for
+    speed.
 
 It refuses rather than guessing: a block with an objective, one that is over- or under-determined, or
 one carrying a solved *inequality* — which determines nothing, so it belongs to no subsystem — raises

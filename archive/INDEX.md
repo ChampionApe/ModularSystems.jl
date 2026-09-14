@@ -29,5 +29,6 @@ Archive by `git mv`, so the history follows the file.
   one-variable subsystem cannot amortise; it converges from slightly more starting points; and the
   decomposition itself costs microseconds per unknown, which is what makes it worth having as a
   diagnostic. Cited from `docs/src/design.md`. Frozen 2026-09-14.
-- `decompositionBenchmark.jl`, `robustnessSweep.jl` — the scripts behind that file, so its tables can
+- `decompositionBenchmark.jl`, `robustnessSweep.jl`, `subsystemFailure.jl`, `cascadeDrift.jl` — the
+  scripts behind that file, so its tables can
   be rerun rather than believed. Frozen 2026-09-14.
