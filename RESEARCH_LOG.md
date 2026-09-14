@@ -10,6 +10,36 @@ points at it. When this file passes a few hundred lines, move the old entries to
 
 Entries are written at the *end* of a session, not during it.
 
+## 2026-09-14 — Structure for naming what a model can be solved as, and three things that needed nothing
+
+RKB asked whether combinations of block, variables and data that are known to be solvable should be a
+type, and whether the states a model can be solved in should be a settings structure. Both, roughly:
+`SolveOptions` (C15), `Problem` and `ModelSpec` (C16). 670 tests. Branch `structure-exploration`,
+revert tag `pre-structure-2026-09-14`.
+
+The most useful finding is that the pairing is also a **perfect matching**, so `decompose` gets a
+Dulmage–Mendelsohn split for free (C14). `diagnose` now names contested equations and undetermined
+unknowns — a block can have zero degrees of freedom and still be structurally singular. But
+`BlockTriangular` as a *solver* was measured at 2×–110× **slower**: entering an interior-point solver
+costs more than a one-variable subsystem can amortise (250× on Ipopt's own time), and on a long
+recursive chain it accumulates relative error where the path passes near zero (C18). Kept as a
+convergence fallback only. Tables in `archive/decompositionMeasurements.md`.
+
+Three things turned out to need no code at all, each settled by writing the case out by hand first:
+cross-model transfer for soft links (C19), composing modes over orthogonal axes (C20, function
+composition — eight modes from six ingredients in five lines), and index-restricted modes
+(C21, a window is `compose(periods[a:b])`). What soft-linking *did* need was the loop, because every
+individual solve in a diverging link reports success.
+
+Two wrong-answer bugs, both found by review and both now pinned. `BlockTriangular` silently dropped
+solved inequalities and returned the wrong root of x²=9 under x≤0. And `fixed_point!` measured its
+convergence on the *damped* iterate, making the effective tolerance `tol/(1-damping)` — unbounded —
+so it reported "converged after 1 pass" on a link that grows without bound. That second one is
+findings #3; #4 records that `+` on blocks was quadratic in bulk, which `compose` fixes.
+
+Open: C17 (small subsystems avoiding the solver) and the API trims a design review recommended —
+`modes`/`keys` duplication, `overdetermined`/`underdetermined` reading as predicates.
+
 ## 2026-09-14 — Everything designed is now implemented
 
 Closed the last code items: the swap interface (C3) as non-mutating `endogenize` / `exogenize` with

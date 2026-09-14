@@ -277,6 +277,23 @@ copies `O(n²)` constraints: 0.32 s for 2,000 two-equation blocks, against about
 `compose`. `sum` over a `Vector` or `Tuple` of blocks calls `compose` for you; `sum` over a
 *generator* cannot, and falls back to the quadratic fold.
 
+Building a model this way — one block per period, or per sector — buys something beyond tidiness: a
+**window** is then a composition too. Given `periods = [period(t) for t in 1:50]`,
+`compose(periods[1:10])` is the first decade and nothing else, with every later period exogenous and
+read from the dataset by the ordinary substitution path. A rolling horizon is a loop over windows
+sharing one dataset, each reading the previous one's answer with no mechanism of its own:
+
+```julia
+for start in 1:10:50
+    solve!(compose(periods[start:(start + 9)]), data; options = opts)
+end
+```
+
+Solving the whole horizon at once and rolling it in five windows agree to 2.4e-10 on the model in
+`archive/windowedSolve.jl`. Note that exogenising the later variables would *not* be enough on its
+own — their equations have to be gone, since an equation left in with no unknown left in it is a
+constant equation, true or false by accident of the data.
+
 A composed block is **never** marked square, whatever its parts claimed — two square blocks need not
 compose to a square system, so inheriting the claim would skip the check where it is most likely to
 catch something. Re-assert explicitly:

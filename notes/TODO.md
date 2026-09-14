@@ -169,11 +169,12 @@ one pass and `sum` over a vector or tuple routes to it. Folding `+` copied `O(n�
 0.32 s for 2,000 two-equation blocks, 1.25 ms now. Found while testing whether C21 could be handled
 by composing per-period blocks, which it can. Reasoning in `docs/src/design.md`.
 
-**C21. Index-restricted modes.** Open. "Solve periods 1–10 only", or one region of a multi-region
-model, is a real modelling need with no answer in the package. `examples/multiModeModel.jl` sidesteps
-it by writing two different closure blocks (`accumulation` and `steady`), which works but does not
-generalise: it cannot express *the same* block over a subset of its index set. `IndexSet` is the
-obvious raw material. Related to C20, since a horizon is another orthogonal axis.
+**C21. ~~Index-restricted modes.~~** Closed 2026-09-14: a window is `compose(periods[a:b])`, given
+a block built per period. Everything outside is exogenous and read from the dataset by the ordinary
+substitution path, so a rolling horizon needs no mechanism — checked at 2.4e-10 against solving the
+whole horizon at once. `restrict(block, group)` was considered for the case of a whole-horizon block
+already written as one `@block`, and deliberately not built: it needs three judgement calls with no
+right answer. Reasoning in `docs/src/design.md`.
 
 ## Documentation
 

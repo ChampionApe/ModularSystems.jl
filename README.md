@@ -13,7 +13,7 @@ objective and be solved as an optimization problem.
 
 **Status: everything designed so far is implemented.** Both solve paths — square systems and blocks
 carrying an objective — work and are tested end to end, through calibration, baseline, scenario and
-minimum-distance estimation.
+minimum-distance estimation, and a model can be held as a set of named, checked configurations.
 
 | | |
 |---|---|
@@ -23,7 +23,11 @@ minimum-distance estimation.
 | `VariableGroup`, `@group`, tags | named collections of variable cells |
 | `IndexSet` | sparsity as a value, without a custom array type |
 | `diagnose` | system shape and structural problems, before a solver runs |
+| `decompose` | the pairing read as a matching: solve order, and what is over- or under-determined |
 | `with_residuals` | opt-in slack for locating inconsistent data |
+| `SolveOptions` | how a solve is run, as a reusable value |
+| `Problem`, `ModelSpec` | named configurations of a model, and the set of them |
+| `fixed_point!` | soft-linked models iterated to agreement, raising if they do not settle |
 
 **Nothing in the API is stable**, and the package is not registered.
 

@@ -690,6 +690,32 @@ unknowns — so composing in either order gives the same block, constraint for c
 for pairing. And where they cannot commute, because the equation being re-pointed is in a block not
 yet added, `swap` raises and names the variable rather than silently building something adjacent.
 
+### A window of periods is a composition, not a restriction
+
+*Decided 2026-09-14 — `notes/TODO.md` C21.*
+
+Solving part of a horizon — periods 1 to 10 of fifty, one region of a multi-region model — needs the
+equations *outside* the window gone, not merely their variables exogenised: an equation left in with
+no unknown in it is a constant equation, true or false by accident of the data.
+
+Nothing new is needed, provided the block is built as a composition in the first place. A block per
+period, and a window is `compose(periods[a:b])`. Everything outside is exogenous and read from the
+dataset by the ordinary substitution path, so a rolling horizon is a loop over windows sharing one
+dataset — each window reads the previous one's answer with no mechanism of its own, the same way a
+subsystem does in a block-triangular solve. Checked against solving the whole horizon at once: worst
+disagreement 2.4e-10 over twenty periods in five windows (`archive/windowedSolve.jl`).
+
+A window is a `Block -> Block` function, so it composes with the mode idiom above like any other axis.
+
+**`restrict(block, group)` — keeping the constraints that determine a given set of variables — was
+considered and deliberately not built.** It would serve someone who already has a whole-horizon block
+written as one `@block` and wants to cut it down, which is a real position to be in. But it needs
+three judgement calls with no obviously right answer: what to do with a solved constraint that is
+unpaired and so cannot be attributed to any variable, what to do with `@check` constraints written
+over the whole horizon, and whether a dropped equation should be an error or a silent omission.
+Reopen it when a model exists that cannot reasonably be written per period — not before, because the
+composition route has none of those questions.
+
 ### Combining many blocks is one pass, not a fold
 
 *Decided 2026-09-14 — `notes/TODO.md` C22.*

@@ -30,5 +30,9 @@ Archive by `git mv`, so the history follows the file.
   decomposition itself costs microseconds per unknown, which is what makes it worth having as a
   diagnostic. Cited from `docs/src/design.md`. Frozen 2026-09-14.
 - `decompositionBenchmark.jl`, `robustnessSweep.jl`, `subsystemFailure.jl`, `cascadeDrift.jl` — the
-  scripts behind that file, so its tables can
-  be rerun rather than believed. Frozen 2026-09-14.
+  scripts behind that file, so its tables can be rerun rather than believed. Frozen 2026-09-14.
+- `modeComposition.jl` — the measurement behind C20: eight modes from six ingredients in five lines
+  by composing `Block -> Block` functions, and a check that `swap` and `+` commute. Frozen
+  2026-09-14.
+- `windowedSolve.jl` — the measurement behind C21: a rolling horizon in five windows agrees with the
+  whole-horizon solve to 2.4e-10, using only `compose`. Frozen 2026-09-14.
