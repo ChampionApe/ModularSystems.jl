@@ -10,6 +10,27 @@ points at it. When this file passes a few hundred lines, move the old entries to
 
 Entries are written at the *end* of a session, not during it.
 
+## 2026-09-14 — Cleared the open list down to three decisions
+
+Implemented the optimization path, composition (C6), `diagnose` and source tracking (C11), tags (I6),
+`IndexSet` (I8), and wrote the naming convention (C4). C12 (slice views) and C13 (sparse notation) are
+deferred deliberately, each recorded with what would reopen it. 325 tests, docs building with the
+manual now carrying the `@block` grammar reference.
+
+Two defects found by measuring rather than reasoning. The binding-bound check had a tolerance of
+1e-8, which could never fire: an interior-point solver relaxes bounds and stops slightly *outside*
+them — Ipopt by 1.7e-8 in the case measured. Every earlier square-path test used an equality that
+pins the variable exactly, so none of them caught it. And `add_constraint!` detected duplicate
+pairings by scanning every existing constraint, making block construction quadratic; noticed while
+designing composition, since that is what makes large blocks likely.
+
+The grammar also gained fixed indices (`K[t0]`, `x[s ∈ S, :Equity, t ∈ T]`), which the parser had
+rejected outright — surfaced by a composition test, not by design review.
+
+Still open, all three waiting on RKB: the swap interface (C3), whether residuals stay (C7), and
+whether to register (T2). C7 is coupled to C3, since the residual workflow is expressed through a
+swap.
+
 ## 2026-09-14 — Square systems solve end to end
 
 Implemented I1–I5: `Dataset` and the model layout, `VariableGroup`, `Block`, the square solve path,
