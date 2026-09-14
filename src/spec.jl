@@ -34,34 +34,43 @@ struct ModelSpec
     model::JuMP.AbstractModel
     names::Vector{Symbol}
     problems::Dict{Symbol,Problem}
+    about::Dict{Symbol,String}
 end
 
-ModelSpec(model::JuMP.AbstractModel) = ModelSpec(model, Symbol[], Dict{Symbol,Problem}())
+ModelSpec(model::JuMP.AbstractModel) =
+    ModelSpec(model, Symbol[], Dict{Symbol,Problem}(), Dict{Symbol,String}())
 
 JuMP.owner_model(s::ModelSpec) = s.model
 
 """
-    register!(spec::ModelSpec, name::Symbol, p::Problem) -> ModelSpec
-    register!(spec::ModelSpec, name::Symbol, block, data; kwargs...) -> ModelSpec
+    register!(spec::ModelSpec, name::Symbol, p::Problem; about = "") -> ModelSpec
+    register!(spec::ModelSpec, name::Symbol, block, data; about = "", kwargs...) -> ModelSpec
 
 Add a named mode. The second form builds the [`Problem`](@ref) in place, taking its keywords.
+
+`about` is one line of prose, shown when the spec is displayed. Worth writing: composition through
+`+` is not recoverable from the result, so two modes that answer completely different questions —
+a steady-state calibration and a dynamic one, say — otherwise print as two identical rows of counts.
+The name is the identity; this is the explanation.
 
 Raises on a name already registered rather than replacing it: overwriting a mode silently is how a
 workflow ends up running something other than what its script says. Remove it first with
 [`unregister!`](@ref) if replacing is what you mean.
 """
-function register!(s::ModelSpec, name::Symbol, p::Problem)
+function register!(s::ModelSpec, name::Symbol, p::Problem; about::AbstractString = "")
     haskey(s.problems, name) && throw(ArgumentError(
         "mode :$name is already registered; use unregister! first if you mean to replace it"))
     p.block.model === s.model || throw(ArgumentError(
         "mode :$name is over a different model than this spec"))
     push!(s.names, name)
     s.problems[name] = p
+    isempty(about) || (s.about[name] = String(about))
     return s
 end
 
-register!(s::ModelSpec, name::Symbol, block::Block, data::Dataset; kwargs...) =
-    register!(s, name, Problem(block, data; kwargs...))
+register!(s::ModelSpec, name::Symbol, block::Block, data::Dataset;
+          about::AbstractString = "", kwargs...) =
+    register!(s, name, Problem(block, data; kwargs...); about = about)
 
 """
     unregister!(spec::ModelSpec, name::Symbol) -> ModelSpec
@@ -71,6 +80,7 @@ Remove a mode. Raises if it is not there, so a typo does not pass quietly.
 function unregister!(s::ModelSpec, name::Symbol)
     haskey(s.problems, name) || throw(KeyError(name))
     delete!(s.problems, name)
+    delete!(s.about, name)
     deleteat!(s.names, findfirst(==(name), s.names))
     return s
 end
@@ -109,49 +119,48 @@ diagnose(s::ModelSpec) = [name => diagnose(s[name]) for name in s.names]
 """
     assert_solvable(spec::ModelSpec) -> ModelSpec
 
-Raise [`StructuralError`](@ref) on the first mode that is not structurally sound, naming it.
+Raise [`StructuralError`](@ref) on the first mode that is not structurally sound, naming it. Naming
+it is the whole point: a diagnosis on its own does not say which of a dozen modes it came from.
 """
 function assert_solvable(s::ModelSpec)
     for name in s.names
         x = diagnose(s[name].block)
-        isclean(x) || throw(StructuralError(x))
+        isclean(x) || throw(StructuralError(x, "mode :$name"))
     end
     return s
 end
 
 # ---------------------------------------------------------------------------------------------
-# Inferred dependencies
+# Readiness
 # ---------------------------------------------------------------------------------------------
+#
+# This is where a dependency graph would go, and deliberately does not. An experiment inferred the
+# edges from modes sharing a dataset object; `examples/multiModeModel.jl` showed why that cannot
+# work, since `solve` is non-mutating and hands back a *fresh* dataset, breaking the identity link
+# the inference needs. Declaring the edges instead was rejected for a better reason than difficulty:
+# a declared order is a second statement of something the equations already imply, and it can drift
+# from them. Readiness cannot — it is read off the data as it actually stands.
 
 """
-    dependencies(spec::ModelSpec) -> Vector{Pair{Symbol,Symbol}}
+    ready(spec::ModelSpec) -> Vector{Symbol}
 
-Which modes feed which, inferred from the datasets they share rather than declared.
+The modes that could be solved right now, in registration order: those whose block is sound *and*
+whose data has every exogenous value the block needs.
 
-A mode that starts from another mode's dataset is downstream of it, so `a => b` means "b starts from
-a's data". This needs no declaration syntax because the sharing is already there in the objects: a
-workflow is chained by handing one mode's dataset to the next, and object identity records that.
+This is what a workflow's ordering looks like when it is derived rather than declared. A calibration
+is ready before the baseline that consumes its output, because the baseline's parameters are still
+unset — nobody has to say so, and nobody can say it wrongly. Re-ask after each solve and the order
+falls out.
 
-Only `start` is read as a dependency edge, never `data`. Two modes writing into the same dataset —
-which is the ordinary calibrate-then-solve-in-place idiom — say nothing about which runs first, and
-treating that as an edge produces a cycle rather than an ordering.
+```julia
+ready(spec)                  # [:calibration]
+solve!(spec, :calibration)
+ready(spec)                  # [:calibration, :baseline]
+```
 
-!!! warning
-    This is inference, not a contract. It sees a dependency only where one mode's `start` is
-    *the same object* as another's `data`; a workflow that copies between stages is invisible to it.
+Use [`diagnose`](@ref) on the spec for *why* a mode is not ready.
 """
-function dependencies(s::ModelSpec)
-    edges = Pair{Symbol,Symbol}[]
-    for downstream in s.names
-        st = s[downstream].start
-        st === nothing && continue
-        for upstream in s.names
-            upstream === downstream && continue
-            s[upstream].data === st && push!(edges, upstream => downstream)
-        end
-    end
-    return edges
-end
+ready(s::ModelSpec) = Symbol[name for name in s.names if isclean(diagnose(s[name]))]
 
 function Base.show(io::IO, s::ModelSpec)
     print(io, "ModelSpec(", length(s.names), " mode", length(s.names) == 1 ? "" : "s")
@@ -159,28 +168,35 @@ function Base.show(io::IO, s::ModelSpec)
     print(io, ")")
 end
 
+# Diagnosed against the DATA, not against the block alone. The block-only check is true of every
+# mode at all times, so a column reporting it says "ok" beside a mode that cannot run — which is
+# exactly what a reader will take it to mean is not the case.
 function Base.show(io::IO, ::MIME"text/plain", s::ModelSpec)
     println(io, "ModelSpec over ", length(s.names), " mode", length(s.names) == 1 ? "" : "s")
+    width = isempty(s.names) ? 0 : maximum(length(String(n)) for n in s.names)
     for name in s.names
         p = s.problems[name]
-        x = diagnose(p.block)
-        println(io, "  :", name, rpad("", max(1, 20 - length(String(name)))),
-                isclean(x) ? "ok  " : "PROBLEM  ", _shape_summary(p, x))
-    end
-    edges = dependencies(s)
-    if !isempty(edges)
-        println(io, "  dependencies (inferred from shared datasets):")
-        for (a, b) in edges
-            println(io, "    :", a, " -> :", b)
-        end
+        x = diagnose(p)
+        print(io, "  :", rpad(String(name), width + 2), rpad(_readiness(x), 34))
+        note = get(s.about, name, "")
+        println(io, isempty(note) ? _shape_summary(p, x) : note)
     end
     return nothing
+end
+
+function _readiness(x::Diagnosis)
+    isclean(x) && return "ready"
+    if !isempty(x.missing_values)
+        names = join((JuMP.name(v) for v in Iterators.take(x.missing_values, 2)), ", ")
+        more = length(x.missing_values) - 2
+        return "needs " * names * (more > 0 ? " (+$more)" : "")
+    end
+    return "NOT SOLVABLE"
 end
 
 function _shape_summary(p::Problem, x::Diagnosis)
     parts = [string(x.unknowns, " unknowns")]
     x.has_objective && push!(parts, "objective")
-    x.has_objective || push!(parts, string("largest ", x.largest))
     p.start === nothing || push!(parts, "started")
     return join(parts, ", ")
 end

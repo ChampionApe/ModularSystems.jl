@@ -13,10 +13,15 @@ wrong rather than parse a message.
 """
 struct StructuralError <: Exception
     diagnosis::Diagnosis
+    context::String
 end
 
+StructuralError(d::Diagnosis) = StructuralError(d, "")
+
 function Base.showerror(io::IO, e::StructuralError)
-    print(io, "StructuralError: this block cannot be solved as it stands.\n")
+    print(io, "StructuralError: ",
+          isempty(e.context) ? "this block" : e.context,
+          " cannot be solved as it stands.\n")
     show(io, e.diagnosis)
 end
 
@@ -86,7 +91,7 @@ julia> b = @block model begin
 julia> data = Dataset(model); data[a] = 3.0;
 
 julia> p = Problem(b, data)
-Problem(1 constraint, 1 unknown, largest subsystem 1)
+Problem(1 constraint, 1 unknown)
 ```
 """
 struct Problem
@@ -114,7 +119,11 @@ function Problem(base::Problem;
                  start::Union{Nothing,Dataset} = base.start,
                  options::SolveOptions = base.options,
                  check::Bool = true)
-    return Problem(block, data; start = start, options = options, check = check)
+    # The check reads nothing but the block, so deriving with the same block cannot change its
+    # answer. Skipping it is exact, not an optimisation with a risk attached — and it is worth
+    # skipping: the check is O(model), and deriving five shocks from one baseline is the idiom.
+    recheck = check && block !== base.block
+    return Problem(block, data; start = start, options = options, check = recheck)
 end
 
 """
@@ -141,6 +150,10 @@ Diagnose a problem's block against its own data, which is the pairing that will 
 """
 diagnose(p::Problem) = diagnose(p.block, p.data)
 
+# Cheap facts only. An earlier version reported the largest subsystem here, which meant every
+# unnamed expression at the REPL ran a decomposition: measured at 62 ms on a 10,000-unknown model
+# and growing linearly. `diagnose` is where that number belongs, because asking for it is then
+# deliberate.
 function Base.show(io::IO, p::Problem)
     n = length(solved_constraints(p.block))
     print(io, "Problem(", n, " constraint", n == 1 ? "" : "s")
@@ -149,11 +162,7 @@ function Base.show(io::IO, p::Problem)
         u = length(unknowns(p.block))
         print(io, ", ", u, " unknown", u == 1 ? "" : "s")
     end
-    if p.block.objective === nothing
-        print(io, ", largest subsystem ", largest_subsystem(decompose(p.block)))
-    else
-        print(io, ", objective")
-    end
+    p.block.objective === nothing || print(io, ", objective")
     p.start === nothing || print(io, ", started")
     print(io, ")")
 end

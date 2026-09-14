@@ -120,7 +120,9 @@
         s = sprint(show, Problem(behavioural, d))
         @test occursin("2 constraints", s)
         @test occursin("2 unknowns", s)
-        @test occursin("largest subsystem 1", s)
+        # Cheap facts only: showing the largest subsystem would decompose the model on every
+        # unnamed expression at the REPL.
+        @test !occursin("subsystem", s)
     end
 
 end
@@ -223,28 +225,71 @@ end
         @test assert_solvable(spec) === spec
     end
 
-    @testset "dependencies are inferred from a shared starting dataset" begin
-        m, spec, observed, v = two_stage()
-        shocked = Dataset(m)
-        shocked[v.N] = 20.0
-        register!(spec, :shock, Problem(spec[:baseline]; data = shocked, start = observed))
-        @test dependencies(spec) == [:calibration => :shock, :baseline => :shock]
-    end
-
-    @testset "two modes writing to one dataset are not read as a dependency" begin
-        # calibration and baseline share `observed` as their data, which says nothing about order.
-        # Treating that as an edge would make a cycle out of the ordinary in-place idiom.
+    @testset "readiness is the workflow's order, derived rather than declared" begin
+        # This is what replaced an inferred dependency graph. Nobody says the calibration comes
+        # first; it is first because the baseline's parameter is not in the data until it has run.
         _, spec, _, _ = two_stage()
-        @test isempty(dependencies(spec))
+        @test ready(spec) == [:calibration]
+        solve!(spec, :calibration)
+        @test ready(spec) == [:calibration, :baseline]
     end
 
-    @testset "show lists the modes and their shapes" begin
+    @testset "show reports readiness against the data, not the block alone" begin
         _, spec, _, _ = two_stage()
         @test occursin("2 modes", sprint(show, spec))
         long = sprint(show, MIME("text/plain"), spec)
         @test occursin(":calibration", long)
         @test occursin(":baseline", long)
-        @test occursin("ok", long)
+        # The block-only check is true of every mode at all times, so reporting it would say "ok"
+        # beside a mode that cannot run. It must say what is missing instead.
+        @test occursin("ready", long)
+        @test occursin("needs rho", long)
+
+        solve!(spec, :calibration)
+        @test !occursin("needs", sprint(show, MIME("text/plain"), spec))
+    end
+
+    @testset "a mode can carry a line of prose" begin
+        m, spec, observed, _ = two_stage()
+        p = spec[:baseline]
+        unregister!(spec, :baseline)
+        register!(spec, :baseline, p; about = "forward run, energy linked")
+        @test occursin("forward run, energy linked", sprint(show, MIME("text/plain"), spec))
+        unregister!(spec, :baseline)
+        @test !occursin("forward run", sprint(show, MIME("text/plain"), spec))
+    end
+
+    # A block nothing can determine `lonely` from, used by the two tests below.
+    function broken_problem(m)
+        @variable(m, stray)
+        @variable(m, lonely)
+        b = Block(m)
+        add_constraint!(b, @build_constraint(stray == 1))
+        set_unknowns!(b, stray, lonely)
+        return Problem(b, Dataset(m); check = false)
+    end
+
+    @testset "an unsound mode is named in the error" begin
+        m, spec, _, _ = two_stage()
+        register!(spec, :broken, broken_problem(m))
+        e = try
+            assert_solvable(spec)
+        catch err
+            err
+        end
+        @test e isa StructuralError
+        @test occursin("mode :broken", sprint(showerror, e))
+    end
+
+    @testset "deriving with the same block does not re-run the structural check" begin
+        m, _, _, _ = two_stage()
+        bad = broken_problem(m)
+        # The check reads only the block, so deriving over the same block cannot change its answer,
+        # and re-running it is pure cost. Observable: this block would fail the check, and deriving
+        # from a problem that already declined it must not resurrect it.
+        @test Problem(bad; data = Dataset(m)) isa Problem
+        # Supplying a different block does re-check, and this one does not pass.
+        @test_throws StructuralError Problem(bad; block = copy(bad.block))
     end
 
 end

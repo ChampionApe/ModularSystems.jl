@@ -110,10 +110,14 @@ opts = SolveOptions(replace_nothing = 1.0)
 # ---------------------------------------------------------------------------------------------
 
 spec = ModelSpec(model)
-register!(spec, :static_calibration, Problem(static_calibration, observed; options = opts))
-register!(spec, :dynamic_calibration, Problem(dynamic_calibration, observed; options = opts))
-register!(spec, :baseline_unlinked, Problem(dynamic_unlinked, observed; options = opts))
-register!(spec, :baseline_linked, Problem(dynamic_linked, observed; options = opts))
+register!(spec, :static_calibration, Problem(static_calibration, observed; options = opts);
+          about = "steady-state closure; productivity from observed output")
+register!(spec, :dynamic_calibration, Problem(dynamic_calibration, observed; options = opts);
+          about = "accumulation closure; productivity path from observed output and K0")
+register!(spec, :baseline_unlinked, Problem(dynamic_unlinked, observed; options = opts);
+          about = "forward run, energy costs held exogenous")
+register!(spec, :baseline_linked, Problem(dynamic_linked, observed; options = opts);
+          about = "forward run, energy module determining costs")
 
 println("=== what this model can do ===")
 show(stdout, MIME("text/plain"), spec)
@@ -123,12 +127,15 @@ show(stdout, MIME("text/plain"), spec)
 assert_solvable(spec)
 println("\nall modes are structurally sound")
 
-# The data-aware diagnosis says something different, and more useful: which modes are ready *now*.
+# Readiness says something different, and more useful: which modes could run *now*. Nobody declared
+# that the calibrations come first — they are first because the baselines need a parameter that is
+# not in the data until a calibration has produced it.
 println("\n=== which modes are ready to run against the observed data ===")
+println("  ready now: ", ready(spec))
 for (name, x) in diagnose(spec)
-    ready = isclean(x) ? "ready" : "not yet: " *
-        join((JuMP.name(v) for v in Iterators.take(x.missing_values, 3)), ", ") * " unset"
-    println("  :", rpad(name, 21), ready)
+    isclean(x) && continue
+    println("  :", rpad(name, 21), "needs ",
+            join((JuMP.name(v) for v in Iterators.take(x.missing_values, 3)), ", "), " …")
 end
 
 # ---------------------------------------------------------------------------------------------
@@ -169,7 +176,8 @@ println("  largest subsystem:       ", largest_subsystem(decompose(dynamic_linke
 # baseline solution. Deriving rather than rebuilding is what keeps the two in step.
 shocked = copy(baseline)
 shocked[Ebar] = [30.0 for _ in P]        # a third less energy
-register!(spec, :shock_linked, Problem(spec[:baseline_linked]; data = shocked, start = baseline))
+register!(spec, :shock_linked, Problem(spec[:baseline_linked]; data = shocked, start = baseline);
+          about = "a third less energy, module linked")
 
 println("\n=== shock: a third less energy, linked ===")
 shock = solve(spec, :shock_linked)
@@ -181,8 +189,11 @@ println("  output multipliers, t=6: ", row(multipliers .* 100, Y, 6), " %")
 # The same shock with the energy module NOT linked in: energy costs stay at their baseline level, so
 # the shock cannot reach the core at all. The difference between the two numbers is the whole content
 # of "linked", and it is one block in a sum.
+# Derived from the registered mode rather than rebuilt, so the options and the block cannot drift
+# apart from the baseline this is meant to be comparable with.
 register!(spec, :shock_unlinked,
-          Problem(dynamic_unlinked, copy(shocked); options = opts, start = baseline))
+          Problem(spec[:baseline_unlinked]; data = copy(shocked), start = baseline);
+          about = "the same shock, module not linked")
 println("\n=== the same shock, unlinked ===")
 shock_u = solve(spec, :shock_unlinked)
 mult_u = shock_u ./ baseline .- 1

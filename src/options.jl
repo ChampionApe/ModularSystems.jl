@@ -3,8 +3,8 @@
 """
     SolveStrategy
 
-How a block is handed to the solver. The choice changes nothing about the answer, only the work done
-to reach it, so it belongs with the settings rather than with the model.
+How a block is handed to the solver. Both strategies compute the same answer; they differ in the work
+done to reach it and in how readily they converge.
 
 Subtypes are [`Monolithic`](@ref) and [`BlockTriangular`](@ref).
 """
@@ -24,13 +24,22 @@ struct Monolithic <: SolveStrategy end
 Solve the block one subsystem at a time, in the order [`decompose`](@ref) finds, each subsystem
 reading the results of the ones before it out of the dataset.
 
-The answer is the same as [`Monolithic`](@ref); what changes is that a system of \$n\$ unknowns
-becomes a sequence of much smaller ones, which is worth doing exactly when
-[`largest_subsystem`](@ref) is well below the size of the block.
+!!! warning "This is a convergence fallback, not a speed optimisation"
+    It is **slower** than [`Monolithic`](@ref) — measured at 2× to 110× slower across model sizes
+    from 125 to 21,500 unknowns. Entering an interior-point solver has a setup cost independent of
+    problem size, and a one- or two-variable subsystem cannot amortise it: Ipopt's summed solve
+    time over 400 tiny subsystems was 0.99 s against 0.004 s for the same system solved at once.
 
-Requires a structurally sound square system: a block with an objective, or one whose decomposition
-has an over- or under-determined part, raises rather than solving something adjacent to what was
-asked.
+    What it buys is convergence. Each subsystem starts from the results of the ones before it,
+    where a monolithic solve starts from whatever was supplied for everything at once. Over 70
+    combinations of model shape and starting point, this converged 62 times against 58. Reach for
+    it when a solve will not converge, not to make one faster.
+
+    Tables in `archive/decompositionMeasurements.md`.
+
+Requires a structurally sound square system. A block with an objective, one whose decomposition has
+an over- or under-determined part, or one carrying a solved **inequality** — which determines nothing
+and so belongs to no subsystem — raises rather than solving something adjacent to what was asked.
 """
 struct BlockTriangular <: SolveStrategy end
 

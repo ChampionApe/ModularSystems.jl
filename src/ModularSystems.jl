@@ -53,7 +53,7 @@ export IndexSet, axisnames, select_axes, group_by
 export swap, endogenize, exogenize
 export with_residuals, residual, residuals, has_residuals
 export Problem, StructuralError, assert_solvable
-export ModelSpec, register!, unregister!, modes, dependencies
+export ModelSpec, register!, unregister!, modes, ready
 
 """
     ModularSystemsVersion() -> VersionNumber
