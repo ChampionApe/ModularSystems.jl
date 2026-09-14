@@ -264,6 +264,19 @@ true
 A variable determined in both blocks raises rather than one equation quietly winning, and at most one
 objective may appear across a sum.
 
+For many blocks — one per period, one per sector, which is the idiom this package is for — use
+[`compose`](@ref), which combines them in a single pass:
+
+```jldoctest quickstart
+julia> length(compose([labour, wages]))
+4
+```
+
+`+` is non-mutating, so it copies both constraint vectors each time and folding it over `n` blocks
+copies `O(n²)` constraints: 0.32 s for 2,000 two-equation blocks, against about a millisecond for
+`compose`. `sum` over a `Vector` or `Tuple` of blocks calls `compose` for you; `sum` over a
+*generator* cannot, and falls back to the quadratic fold.
+
 A composed block is **never** marked square, whatever its parts claimed — two square blocks need not
 compose to a square system, so inheriting the claim would skip the check where it is most likely to
 catch something. Re-assert explicitly:

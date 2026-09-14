@@ -674,6 +674,24 @@ unknowns — so composing in either order gives the same block, constraint for c
 for pairing. And where they cannot commute, because the equation being re-pointed is in a block not
 yet added, `swap` raises and names the variable rather than silently building something adjacent.
 
+### Combining many blocks is one pass, not a fold
+
+*Decided 2026-09-14 — `notes/TODO.md` C22.*
+
+`+` is non-mutating, which is right: a composed block is a value and neither part is disturbed. The
+cost is that it copies both constraint vectors every time, so folding it over `n` blocks copies
+`O(n²)` constraints. Measured at 0.32 s for 2,000 two-equation blocks, against 1.25 ms for a single
+pass — and building a model out of many small blocks, one per period or per sector, is precisely the
+idiom this package exists to support, so the quadratic path was on the main road rather than off it.
+
+`compose(blocks)` applies the same rules in one pass, and `sum` over a `Vector` or `Tuple` of blocks
+routes to it. `sum` over a **generator** cannot be intercepted without claiming a method far too
+broad, so it still folds; `compose`'s docstring says so rather than leaving it to be discovered.
+
+This is the second time non-mutating composition has cost something quadratic — `add_constraint!`
+scanned every existing constraint for a duplicate pairing until C6 replaced it with a `Set`. The
+pattern is worth naming: an operation that is cheap for two and used for two thousand.
+
 ## Open
 
 **Whether slices return views** (C12) and **a sparse notation layer** (C13) are both deferred

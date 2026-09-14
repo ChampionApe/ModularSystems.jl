@@ -210,4 +210,116 @@
         out = solve(both, Dataset(m); replace_nothing = 1.0)
         @test out[x] ≈ 2.0 && out[y] ≈ 3.0
     end
+
+    # -----------------------------------------------------------------------------------------
+    # compose: the n-ary form
+    # -----------------------------------------------------------------------------------------
+
+    function period_blocks(m, T)
+        @variable(m, K[1:T])
+        @variable(m, Y[1:T])
+        @variable(m, A[1:T])
+        @variable(m, K0)
+        blocks = Block[]
+        for t in 1:T
+            b = Block(m)
+            prev = t == 1 ? K0 : K[t - 1]
+            add_constraint!(b, @build_constraint(K[t] == 0.9 * prev + A[t]), determines = K[t])
+            add_constraint!(b, @build_constraint(Y[t] == 2 * K[t]), determines = Y[t])
+            push!(blocks, b)
+        end
+        return blocks, (K = K, Y = Y, A = A, K0 = K0)
+    end
+
+    @testset "compose agrees with folding + " begin
+        m = Model()
+        blocks, _ = period_blocks(m, 6)
+        folded = reduce(+, blocks)
+        composed = compose(blocks)
+        @test length(composed) == length(folded)
+        @test [c.determines for c in composed.constraints] ==
+              [c.determines for c in folded.constraints]
+        @test Set(collect(unknowns(composed))) == Set(collect(unknowns(folded)))
+        @test Set(collect(pairings(composed))) == Set(collect(pairings(folded)))
+        @test composed.paired == folded.paired
+    end
+
+    @testset "sum over a vector and a tuple routes through compose" begin
+        m = Model()
+        blocks, _ = period_blocks(m, 4)
+        @test length(sum(blocks)) == length(compose(blocks))
+        @test length(sum((blocks[1], blocks[2], blocks[3]))) == 6
+    end
+
+    @testset "compose keeps the rules + has" begin
+        m = Model()
+        blocks, v = period_blocks(m, 3)
+
+        # never square, whatever the parts claimed
+        for b in blocks
+            b.assert_square = true
+        end
+        @test !compose(blocks).assert_square
+
+        # a variable determined twice is an error
+        dup = Block(m)
+        add_constraint!(dup, @build_constraint(v.Y[1] == 5), determines = v.Y[1])
+        e = try
+            compose([blocks[1], dup])
+        catch err
+            err
+        end
+        @test e isa ArgumentError
+        @test occursin("determined in more than one", e.msg)
+
+        # at most one objective across the whole collection
+        o1 = Block(m)
+        set_objective!(o1, MOI.MIN_SENSE, v.K[1])
+        set_unknowns!(o1, v.K[1])
+        o2 = Block(m)
+        set_objective!(o2, MOI.MIN_SENSE, v.K[2])
+        set_unknowns!(o2, v.K[2])
+        @test_throws ArgumentError compose([o1, o2])
+        @test compose([blocks[1], o1]).objective !== nothing
+    end
+
+    @testset "compose checks the model and refuses an empty collection" begin
+        m = Model()
+        blocks, _ = period_blocks(m, 2)
+        other = Model()
+        @variable(other, z)
+        stray = Block(other)
+        add_constraint!(stray, @build_constraint(z == 1), determines = z)
+        @test_throws ArgumentError compose([blocks[1], stray])
+        @test_throws ArgumentError compose(Block[])
+    end
+
+    @testset "the unknowns rule survives the n-ary form" begin
+        m = Model()
+        blocks, v = period_blocks(m, 3)
+        # none declares, so the result declares none either and stays derivable
+        @test compose(blocks).declared_unknowns === nothing
+
+        # once any part declares, the result declares the union
+        set_unknowns!(blocks[2], v.K[2], v.Y[2], v.A[2])
+        composed = compose(blocks)
+        @test composed.declared_unknowns !== nothing
+        @test v.A[2] in unknowns(composed)          # carried from the declaration
+        @test v.K[1] in unknowns(composed)          # derived from the others' pairings
+    end
+
+    @testset "composing many blocks is linear, not quadratic" begin
+        # The reason compose exists. Folding + copies both constraint vectors every time, so n
+        # blocks cost O(n^2); at n = 2000 that was 0.32 s against about a millisecond here. The
+        # assertion is deliberately loose -- it is guarding against a return to quadratic, not
+        # pinning a timing.
+        m = Model()
+        blocks, _ = period_blocks(m, 2000)
+        compose(blocks[1:10])                       # warm
+        small = @elapsed compose(blocks[1:250])
+        large = @elapsed compose(blocks)
+        @test length(compose(blocks)) == 4000
+        # 8x the blocks must not cost 30x the time; quadratic would be 64x.
+        @test large < 30 * max(small, 1e-6)
+    end
 end

@@ -164,6 +164,11 @@ a `Block -> Block` function and functions already compose, so a three-axis produ
 and `+` commute where both apply, and `swap` raises where they cannot, both checked. Reasoning in
 `docs/src/design.md`; the idiom is in the manual under *Modes over several axes*.
 
+**C22. ~~Combining many blocks was quadratic.~~** Closed 2026-09-14: `compose(blocks)` does it in
+one pass and `sum` over a vector or tuple routes to it. Folding `+` copied `O(n²)` constraints —
+0.32 s for 2,000 two-equation blocks, 1.25 ms now. Found while testing whether C21 could be handled
+by composing per-period blocks, which it can. Reasoning in `docs/src/design.md`.
+
 **C21. Index-restricted modes.** Open. "Solve periods 1–10 only", or one region of a multi-region
 model, is a real modelling need with no answer in the package. `examples/multiModeModel.jl` sidesteps
 it by writing two different closure blocks (`accumulation` and `steady`), which works but does not
