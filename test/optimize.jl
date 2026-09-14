@@ -84,7 +84,8 @@
     end
 
     @testset "the bound tolerance is looser than the solver's bound relaxation" begin
-        # Regression: Ipopt relaxes bounds and stops slightly OUTSIDE them — about 1.7e-8 below a
+        # Regression for notes/crossCuttingFindings.md #1: Ipopt relaxes bounds and stops slightly
+        # OUTSIDE them — about 1.7e-8 below a
         # lower bound in this case. A tolerance at solver precision detects nothing at all, so the
         # default must stay looser than the relaxation. Tightening it silently disables the check.
         m = testmodel()

@@ -11,11 +11,21 @@ objective and be solved as an optimization problem.
 
 `CLAUDE.md` holds the working conventions; this file is a map.
 
-**Status: both solve paths work.** `Dataset`, `VariableGroup`, `Block`, the `@block` macro, the
-square solve path and the optimization path are tested end to end — calibration, baseline, scenario
-and minimum-distance estimation. Blocks compose with `+`, and `diagnose` reports a system's shape and its structural problems before
-a solver runs. Tags, `IndexSet`, sparse patterns and endo-exo swapping (`swap` / `endogenize` / `exogenize`) work.
-Residuals are available opt-in for locating inconsistent data. Nothing in the API is stable.
+**Status: everything designed so far is implemented.** Both solve paths — square systems and blocks
+carrying an objective — work and are tested end to end, through calibration, baseline, scenario and
+minimum-distance estimation.
+
+| | |
+|---|---|
+| `Dataset` | values, problem bounds and solve metadata per scenario; arithmetic across scenarios |
+| `Block`, `@block` | constraints, optional pairing, checks, objectives; composed with `+` |
+| `swap`, `endogenize`, `exogenize` | calibration as a change of unknowns, non-mutating |
+| `VariableGroup`, `@group`, tags | named collections of variable cells |
+| `IndexSet` | sparsity as a value, without a custom array type |
+| `diagnose` | system shape and structural problems, before a solver runs |
+| `with_residuals` | opt-in slack for locating inconsistent data |
+
+**Nothing in the API is stable**, and the package is not registered.
 
 `docs/src/design.md` has what is decided and why; `notes/TODO.md` has the open questions and the
 implementation order.
@@ -53,6 +63,13 @@ julia --project=docs docs/make.jl
 ```
 
 The site lands in `docs/build/`, which is gitignored — CI builds and deploys the published copy.
+
+Examples need a solver, which the package environment deliberately does not carry. Run them against
+the docs environment:
+
+```
+julia --project=docs examples/labourMarket.jl
+```
 
 `--project` is not optional in either command: without it Julia uses the global environment and a
 dependency missing from `Project.toml` still resolves, so the package appears to work here and fails

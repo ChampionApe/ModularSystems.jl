@@ -6,7 +6,7 @@
 #
 # These are `exogenize`/`endogenize` rather than `fix`/`free` because JuMP exports `fix` and `unfix`.
 # Taking those names would force every user of both packages to qualify the call, and these are the
-# words this literature already uses.
+# words this literature already uses. See notes/crossCuttingFindings.md #2.
 
 _rebuild(b::Block, constraints, paired, declared, assert_square) =
     Block(b.model, constraints, paired, declared, b.objective, assert_square)

@@ -22,11 +22,9 @@ why; `notes/TODO.md` holds the open questions and the implementation order (I1�
 writing code — several decisions are taken and should not be re-litigated, and several are
 deliberately open.
 
-What exists: `Dataset` and the model layout, `VariableGroup`, `Block`, the `@block` and `@group`
-macros, and **both solve paths** — square, and optimization for a block carrying an objective — with
-bounds, the binding-bound check and `@check` evaluation. Blocks compose with `+`, and `diagnose` reports a
-system's shape. Tags, `IndexSet`, endo-exo swapping and opt-in residuals
-all work. Every recorded design decision is implemented. `notes/TODO.md` has the live
+**Every recorded design decision is implemented.** Both solve paths work; so do composition,
+swapping, groups, tags, `IndexSet`, `diagnose` and opt-in residuals. `notes/TODO.md` lists what is
+left, which is registration (T2) and nothing else. `notes/TODO.md` has the live
 list.
 
 **Squareness is a predicate, not an invariant.** A block does not have to pair every constraint with
@@ -87,7 +85,9 @@ Julia 1.10.5 locally; `[compat]` declares `julia = "1.10"` and CI tests 1.10 and
   code that is easy to read, write and adjust while a model is being developed. When two designs are
   otherwise even, these decide. A design argued only on elegance does not beat one with a
   measurement behind it.
-- **Naming.** Types are `CamelCase`; enum values are `SCREAMING_CASE` (`SOLVED`, `CHECKED`).
+- **Naming.** Check `names(JuMP)` before choosing an exported name. `fix` and `unfix` are JuMP
+  exports, which is why the swap primitives are `endogenize`/`exogenize`: a clash forces every user
+  of both packages to qualify the call. Types are `CamelCase`; enum values are `SCREAMING_CASE` (`SOLVED`, `CHECKED`).
   Functions are lowercase: predicates follow Base and run the words together (`issquare`, `isclean`),
   everything else separates them with underscores (`set_bounds!`, `degrees_of_freedom`,
   `select_axes`). A function that mutates its first argument ends in `!`. Anything internal takes a

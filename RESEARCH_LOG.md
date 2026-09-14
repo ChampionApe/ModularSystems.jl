@@ -10,6 +10,29 @@ points at it. When this file passes a few hundred lines, move the old entries to
 
 Entries are written at the *end* of a session, not during it.
 
+## 2026-09-14 — Everything designed is now implemented
+
+Closed the last code items: the swap interface (C3) as non-mutating `endogenize` / `exogenize` with
+`swap` on top, and residuals (C7) as opt-in and paired-only. 391 tests. Only T2, registration,
+remains open, and it is on hold pending RKB's review.
+
+Two naming decisions worth remembering, both forced by JuMP's exports rather than by taste. `fix` and
+`unfix` are JuMP exports, so the swap primitives are `endogenize` / `exogenize` — taking JuMP's names
+would have forced every user of both packages to qualify the call, the same cost that ruled out
+shadowing `@variables`. Check `names(JuMP)` before choosing an exported name.
+
+The residual workflow turned out to need no machinery of its own: holding a variable at its observed
+value and letting its residual absorb the gap is a `swap`. That is the clearest evidence so far that
+building the primitive before the feature was right.
+
+Descriptions rewritten throughout, including the GitHub repo description, which still advertised
+*square* systems — a claim the C2 decision contradicted several commits earlier. Worth a habit: the
+repo description is not in the working tree, so no amount of grepping the repo catches it.
+
+Process note: a doc-update script aborted on its first failed assertion twice, silently skipping the
+record updates after it and leaving C6 and then C7 reading as open while the code was already
+committed. The helper now reports misses rather than stopping.
+
 ## 2026-09-14 — Cleared the open list down to three decisions
 
 Implemented the optimization path, composition (C6), `diagnose` and source tracking (C11), tags (I6),

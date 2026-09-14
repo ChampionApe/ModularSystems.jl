@@ -247,7 +247,7 @@ end
 # An interior-point solver does not land exactly on a bound: Ipopt relaxes bounds by roughly 1e-8 and
 # stops slightly outside. A tolerance tighter than that relaxation detects nothing at all, which is
 # why the default is 1e-6 rather than solver-precision. Scaled by the bound so it holds at any
-# magnitude.
+# magnitude. See notes/crossCuttingFindings.md #1.
 _on_bound(val, bound, tol) = abs(val - bound) <= max(tol, tol * abs(bound))
 
 function _binding_bounds(b::Block, d::Dataset, tol::Real)
