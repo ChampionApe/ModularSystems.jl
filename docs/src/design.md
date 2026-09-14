@@ -205,23 +205,8 @@ without rework if it ever needs to be.
 
 *Decided 2026-09-14 — `notes/TODO.md` C5.*
 
-One macro covers both kinds of system:
-
-| Form | Meaning |
-|---|---|
-| `x, expr` | constraint paired with `x` |
-| `x[i ∈ I], expr` | indexed, paired with `x[i]` |
-| `[i ∈ I], expr` | indexed, unpaired |
-| `x[t0], expr` | a fixed index — pairs with that one cell, no loop |
-| `expr` | scalar, unpaired |
-| `@check expr "msg"` | role = check; evaluated after a solve, never solved |
-| `@unknowns ...` | declares the unknown set |
-| `@objective Min expr` | attaches an objective |
-| `@square` | asserts squareness, checked at construction |
-
-A pairing on an inequality is an error, since an inequality determines nothing. `@unknowns` is
-required exactly when some solved constraint is unpaired; in a fully paired block the unknowns are
-derivable.
+One macro covers both kinds of system. The grammar itself is documented in the manual under
+**Reference: the `@block` grammar**; what follows is why it has that shape.
 
 ```julia
 production = @block data begin
