@@ -95,6 +95,10 @@ Things that cost an hour once and would cost it again. All Windows:
   `cmd /c` pattern in `notes/detachedRuns.md`.
 - Julia's first call into a large dependency pays a long compile latency. A test run that seems hung
   is usually precompiling; check before killing it, and do not "fix" it by adding a timeout.
+- After adding a dependency, the **docs environment is stale**: `docs/Manifest.toml` still predates
+  it, and `docs/make.jl` fails on `using ModularSystems` with "does not have X in its dependencies".
+  `julia --project=docs -e "using Pkg; Pkg.resolve()"` fixes it. CI never sees this — it builds the
+  docs environment from scratch — so it only ever bites locally.
 - Documenter shells out to `git rev-parse HEAD`, so `docs/make.jl` fails in a repository with **no
   commits yet** — the error talks about remotes and not about the missing commit. `repo` is pinned
   explicitly in `make.jl`, so a commit is the only thing needed.

@@ -2,6 +2,10 @@ using Documenter
 using Documenter: Remotes
 using ModularSystems
 
+# A jldoctest block runs in a bare sandbox module, not inside the package -- without this line every
+# doctest fails with `UndefVarError: ... not defined in Main` however correct it is.
+DocMeta.setdocmeta!(ModularSystems, :DocTestSetup, :(using ModularSystems); recursive = true)
+
 # doctest = true means every ```jldoctest block in a docstring or manual page is executed and its
 # output compared. That is the whole reason the examples in the manual are worth trusting: they
 # cannot drift from the code without CI going red.
