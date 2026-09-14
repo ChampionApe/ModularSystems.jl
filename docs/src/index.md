@@ -138,6 +138,56 @@ rather than a requirement of one.
 Pairings are still allowed on a block with an objective; they are simply inert, since the pairing is
 documentation and a square-solver precondition rather than something that orders the system.
 
+## Calibration is a swap
+
+Calibration solves the same equations for different variables: a parameter becomes unknown, an
+observed outcome becomes data. [`swap`](@ref) exchanges them and re-points the equation that
+determined the outcome, leaving the equations themselves untouched.
+
+```jldoctest quickstart
+julia> calibration = swap(block, rho => L);
+
+julia> collect(unknowns(calibration))[1] == rho[1]
+true
+
+julia> issquare(calibration)
+true
+
+julia> observed = Dataset(model);
+
+julia> observed[N] = [3200.0, 500.0];
+
+julia> observed[L] = [3200.0, 1000.0];
+
+julia> calibrated = solve(calibration, observed; replace_nothing = 1.0);
+
+julia> round(calibrated[rho[1]], digits = 4)
+1.0
+
+julia> round(calibrated[rho[2]], digits = 4)
+2.0
+```
+
+The behavioural block, unchanged, now reproduces the observation from those parameters — and a swap
+preserves the shape of the system, so a block declared square stays declared square and is
+re-checked.
+
+Either side may be a variable, a container or a group, and group sides pair **in iteration order** —
+which is why a [`VariableGroup`](@ref) is ordered. Use `@group` when the cells need selecting:
+
+```julia
+calibration = swap(block, @group(rho[j in J; j == 1]) => @group(L[j in J; j == 1]))
+```
+
+Underneath are two primitives that mean the same thing whether or not the block is square:
+[`endogenize`](@ref) adds variables to the unknown set, [`exogenize`](@ref) removes them. `swap` is
+the square-case combination that also re-points the pairing. Exogenising a variable that an equation
+determines raises and points you at `swap`, since it would otherwise leave an equation determining
+something no longer being solved for.
+
+(They are `endogenize`/`exogenize` rather than `fix`/`free` because JuMP exports `fix` and `unfix`;
+taking those names would force every user of both packages to qualify the call.)
+
 ## Composing blocks
 
 A block is a unit of model code, and a model is their sum. Each module owns its equations:

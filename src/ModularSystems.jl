@@ -25,6 +25,7 @@ include("macro.jl")
 include("diagnose.jl")
 include("tags.jl")
 include("indexset.jl")
+include("swap.jl")
 
 export ModularSystemsVersion
 export Dataset, SolveMetadata, set_bounds!, bounds, clear_bounds!
@@ -38,6 +39,7 @@ export @block, @group
 export diagnose, Diagnosis, isclean, variables_in
 export Tag, tag!, untag!, tags, has_tag, tagged, describe!, description
 export IndexSet, axisnames, select_axes, group_by
+export swap, endogenize, exogenize
 
 """
     ModularSystemsVersion() -> VersionNumber

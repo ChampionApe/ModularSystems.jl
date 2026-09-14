@@ -31,12 +31,9 @@ behavioural = @block model begin
     @check sum(w[j] * L[j] for j in J) == p * Y  "factor payments exhaust output"
 end
 
-# Calibration: the same equation, solved for the parameter instead of the outcome. Only the unknown
-# set differs — the pairing is documentation, so it does not have to be rewritten.
-calibration = @block model begin
-    @unknowns rho
-    [j in J], L[j] == rho[j] * N[j]
-end
+# Calibration: the same equations, solved for the parameter instead of the outcome. `swap` exchanges
+# which variable each equation is understood to determine; nothing is rewritten.
+calibration = swap(behavioural, rho => L)
 
 observed = Dataset(model)
 observed[N] = [3200.0, 500.0]

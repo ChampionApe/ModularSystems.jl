@@ -429,10 +429,38 @@ An orphan means different things on each path, so the test differs: an unknown i
 bug in a square system, but legitimate if it appears in an objective, and a variable in the objective
 is therefore not reported.
 
-## Open
+### The swap interface
 
-**The swap interface** (`notes/TODO.md` C3, narrowed). The semantics are settled; the surface is not — mutating or
-returning a new block, macro or function, and how cells are selected on each side.
+*Decided 2026-09-14 — `notes/TODO.md` C3.*
+
+Two primitives and one combination, all **non-mutating**:
+
+- `endogenize(block, items...)` adds variables to the unknown set;
+- `exogenize(block, items...)` removes them;
+- `swap(block, new => old, ...)` does both and re-points the equation that determined `old`.
+
+Non-mutating because a calibration variant is then a value. SquareModels.jl's idiom is
+`calibration = copy(block)` followed by a mutating macro, and the copy is a step you can forget; here
+the original is untouched by construction.
+
+Functions rather than a macro, and cells are selected with `@group` when they need selecting
+(`swap(b, @group(mu[j in J]) => @group(L[j in J]))`). That reuses the one index syntax the package
+already has instead of inventing a third, and keeps the macro count down.
+
+**They are `endogenize`/`exogenize`, not `fix`/`free`.** JuMP exports `fix` and `unfix`, so taking
+those names would force every user of both packages to qualify the call — the same cost that ruled
+out shadowing `@variables`. These are also the words this literature already uses.
+
+The primitive is membership of the unknown set, which means the same thing on both solve paths;
+re-pointing a pairing is the square-case extra, which is why `swap` is built on the primitives rather
+than beside them. `exogenize` raises on a variable some equation determines, pointing at `swap`:
+removing it silently would leave an equation determining something no longer being solved for.
+
+`endogenize` and `exogenize` clear the square claim, since they change the shape of the system. A
+swap preserves it — one pairing re-pointed, counts unmoved — so a block declared square stays
+declared square and is re-checked.
+
+## Open
 
 **Whether slices return views** (C12) and **a sparse notation layer** (C13) are both deferred
 deliberately rather than forgotten, each with the thing that would reopen it. C12 waits for a

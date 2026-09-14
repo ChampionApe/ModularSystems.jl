@@ -49,7 +49,7 @@ I4 before I5 was the right call: two macro bugs (a pre-escaped body handed to
 `JuMP.@build_constraint`, and `_parse_head(nothing)`) were easy to localise because everything under
 them was already tested.
 
-Still not implemented: residuals (C7) and swapping (C3) — both waiting on RKB's preference.
+Still not implemented: residuals (C7), which is the last open code item.
 
 ## Code and design
 
@@ -61,10 +61,10 @@ constraints, each optionally paired with a variable and marked *solve* or *check
 set of unknowns and an optional objective. Squareness is a predicate, not a constructor invariant.
 Reasoning in `docs/src/design.md`.
 
-**C3. Settle the swap interface.** Semantics closed 2026-09-14 (the pairing is documentation plus a
-square-solver precondition, so the primitive is `fix`/`free` over a variable group). Still open: is a
-swap mutating or does it return a new block; macro or function; how cells are selected on each side.
-Done looks like: the signature written into `docs/src/design.md` with a worked calibration example.
+**C3. ~~Settle the swap interface.~~** Closed 2026-09-14: non-mutating `endogenize` / `exogenize` over
+a variable group, with `swap(block, new => old)` re-pointing the pairing on top. Named for the domain
+rather than `fix`/`free`, which JuMP exports. Cells are selected with `@group`, so there is no third
+index syntax. Reasoning in `docs/src/design.md`.
 
 **C4. ~~Decide the naming convention.~~** Closed 2026-09-14, written into `CLAUDE.md`: `CamelCase`
 types, `SCREAMING_CASE` enum values, lowercase functions with predicates run together and everything

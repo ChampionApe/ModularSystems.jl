@@ -21,4 +21,5 @@ using Test
     include("diagnose.jl")
     include("tags.jl")
     include("indexset.jl")
+    include("swap.jl")
 end
