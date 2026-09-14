@@ -32,6 +32,8 @@ include("tags.jl")
 include("indexset.jl")
 include("swap.jl")
 include("residuals.jl")
+include("problem.jl")
+include("spec.jl")
 
 export ModularSystemsVersion
 export Dataset, SolveMetadata, set_bounds!, bounds, clear_bounds!
@@ -50,6 +52,8 @@ export Tag, tag!, untag!, tags, has_tag, tagged, describe!, description
 export IndexSet, axisnames, select_axes, group_by
 export swap, endogenize, exogenize
 export with_residuals, residual, residuals, has_residuals
+export Problem, StructuralError, assert_solvable
+export ModelSpec, register!, unregister!, modes, dependencies
 
 """
     ModularSystemsVersion() -> VersionNumber

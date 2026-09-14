@@ -151,4 +151,105 @@
         @test occursin("check at", sprint(showerror, err))
         @test occursin("diagnose.jl", sprint(showerror, err))
     end
+
+    # -----------------------------------------------------------------------------------------
+    # What the decomposition adds
+    # -----------------------------------------------------------------------------------------
+
+    # u is determined twice over, v and r compete for one equation, q appears nowhere at all.
+    # The counts cannot tell these apart; the decomposition can.
+    function deficient()
+        m = Model()
+        @variable(m, k)
+        @variable(m, u)
+        @variable(m, v)
+        @variable(m, w)
+        @variable(m, q)
+        @variable(m, r)
+        b = Block(m)
+        add_constraint!(b, @build_constraint(u == k))
+        add_constraint!(b, @build_constraint(2 * u == 2 * k))
+        add_constraint!(b, @build_constraint(w == u + 1))
+        add_constraint!(b, @build_constraint(r + v == w))
+        set_unknowns!(b, u, v, w, q, r)
+        d = Dataset(m)
+        d[k] = 1.0
+        return b, d
+    end
+
+    @testset "contested equations are reported" begin
+        b, d = deficient()
+        x = diagnose(b, d)
+        @test [i for (i, _) in x.contested] == [1, 2]
+        @test !isclean(x)
+    end
+
+    @testset "undetermined unknowns are separated from orphans" begin
+        b, d = deficient()
+        x = diagnose(b, d)
+        # q appears in nothing, which is the sharper statement, so it is an orphan and must not be
+        # reported a second time under the vaguer heading.
+        @test [JuMP.name(v) for v in x.orphans] == ["q"]
+        @test sort([JuMP.name(v) for v in x.undetermined]) == ["r", "v"]
+        @test isempty(intersect(Set(x.orphans), Set(x.undetermined)))
+    end
+
+    @testset "a balanced but structurally singular block is not clean" begin
+        # Two equations determine u, and v is determined by nothing: the counts balance exactly.
+        m = Model()
+        @variable(m, k)
+        @variable(m, u)
+        @variable(m, v)
+        @variable(m, w)
+        b = Block(m)
+        add_constraint!(b, @build_constraint(u == k))
+        add_constraint!(b, @build_constraint(2 * u == 2 * k))
+        add_constraint!(b, @build_constraint(w == u + 1))
+        set_unknowns!(b, u, v, w)
+        d = Dataset(m)
+        d[k] = 1.0
+
+        x = diagnose(b, d)
+        @test x.degrees_of_freedom == 0      # the count says nothing is wrong
+        @test !isclean(x)                    # the decomposition says otherwise
+        @test !isempty(x.contested)
+    end
+
+    @testset "a sound block reports its largest subsystem and stays clean" begin
+        m = Model()
+        @variable(m, a)
+        @variable(m, x)
+        @variable(m, y)
+        @variable(m, z)
+        b = @block m begin
+            @square
+            x, x == a
+            y, y == x + 1
+            z, z == y + x
+        end
+        d = Dataset(m)
+        d[a] = 1.0
+        x = diagnose(b, d)
+        @test isclean(x)
+        @test x.largest == 1
+        @test isempty(x.contested)
+        @test isempty(x.undetermined)
+        @test occursin("largest subsystem   1", sprint(show, x))
+    end
+
+    @testset "an objective block skips the decomposition" begin
+        m = Model()
+        @variable(m, x)
+        b = @block m begin
+            @unknowns x
+            @objective Min (x - 2)^2
+            x >= 0
+        end
+        d = Dataset(m)
+        x = diagnose(b, d)
+        @test isempty(x.contested)
+        @test isempty(x.undetermined)
+        @test x.largest == 0
+        @test !occursin("largest subsystem", sprint(show, x))
+    end
 end

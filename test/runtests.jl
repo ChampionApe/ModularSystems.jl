@@ -25,4 +25,5 @@ using Test
     include("indexset.jl")
     include("swap.jl")
     include("residuals.jl")
+    include("problem.jl")
 end
