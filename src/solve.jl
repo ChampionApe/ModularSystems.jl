@@ -107,8 +107,8 @@ end
 # Building the intermediate model
 # ---------------------------------------------------------------------------------------------
 
-function _build_model(b::Block, d::Dataset; start_values, replace_nothing, silent)
-    factory = optimizer_factory(b.model)
+function _build_model(b::Block, d::Dataset, o::SolveOptions; start_values)
+    factory = o.optimizer === nothing ? optimizer_factory(b.model) : o.optimizer
     factory === nothing && throw(ArgumentError(
         "no optimizer for this model; call set_optimizer_factory!(model, Ipopt.Optimizer) or pass " *
         "optimizer = ... to solve"))
@@ -118,7 +118,7 @@ function _build_model(b::Block, d::Dataset; start_values, replace_nothing, silen
     # The intermediate model is ours, not the caller's, so it does not inherit their verbosity
     # setting and would otherwise flood stdout on every solve. Failures still raise, and the
     # termination status is recorded on the dataset.
-    silent && JuMP.set_silent(sm)
+    o.silent && JuMP.set_silent(sm)
 
     unk = unknowns(b)
     map = sizehint!(Dict{VariableRef,VariableRef}(), length(unk))
@@ -133,7 +133,7 @@ function _build_model(b::Block, d::Dataset; start_values, replace_nothing, silen
 
         start = start_values === nothing ? nothing : start_values[v]
         start === nothing && (start = d[v])
-        start === nothing && (start = replace_nothing)
+        start === nothing && (start = o.replace_nothing)
         start === nothing || isnan(start) || JuMP.set_start_value(nv, start)
     end
 
@@ -173,21 +173,16 @@ intermediate model holds only the unknowns. Bounds applied to an unknown are the
 intrinsic JuMP bounds with the dataset's problem bounds.
 
 # Keywords
-- `optimizer`: optimizer factory, defaulting to the one stored by [`set_optimizer_factory!`](@ref).
-- `start_values::Dataset`: starting points, falling back to `d`'s own values.
-- `replace_nothing::Number`: starting point for an unknown with no value anywhere. Useful in early
-  calibration, when a variable exists but has no data yet.
-- `check_binding_bounds::Bool = true`: on a square system, raise [`BindingBoundError`](@ref) if a
-  bound is active at the solution. Bounds active on an optimization solve are recorded in
-  `meta.binding_bounds` and never raised — there they are expected.
-- `bound_tolerance::Real = 1e-6`: how close to a bound counts as sitting on it, as
-  `max(tol, tol * |bound|)` so it holds at any scale. It must not be tighter than the solver's own
-  bound relaxation — an interior-point solver stops a little *outside* a bound (Ipopt by around
-  2e-8), so a tolerance of 1e-8 would never fire.
-- `silent::Bool = true`: suppress solver output. The intermediate model is built here rather than by
-  the caller, so it does not inherit their verbosity setting; pass `false` to see the solver's log.
-- `run_checks::Bool = true`, `check_atol`, `check_rtol`: evaluate the block's `@check` constraints
-  against the solution, raising [`CheckFailure`](@ref) on a miss.
+- `options::SolveOptions`: how the solve is run. Every field of [`SolveOptions`](@ref) may also be
+  passed here directly as a keyword, which overrides `options` for this call — so
+  `solve!(b, d; silent = false)` and `solve!(b, d; options = SolveOptions(o; silent = false))` mean
+  the same thing, and the settings can be named once and reused.
+- `start_values::Dataset`: starting points, falling back to `d`'s own values. Data rather than a
+  setting, which is why it is a keyword of its own and not a field of `SolveOptions`.
+
+!!! note
+    `optimizer` names the solver for **this solve only** and does not attach it to the model.
+    [`set_optimizer_factory!`](@ref) is what sets a model's default.
 
 A block carrying an objective is solved as an optimization problem: the objective is substituted
 from the dataset like any other expression and attached to the same intermediate model, so the two
@@ -196,20 +191,13 @@ paths differ only at the tail. `meta.objective_value` records its value.
 function solve!(
     b::Block,
     d::Dataset;
-    optimizer = nothing,
+    options::SolveOptions = _DEFAULT_OPTIONS,
     start_values::Union{Nothing,Dataset} = nothing,
-    replace_nothing::Union{Nothing,Number} = nothing,
-    check_binding_bounds::Bool = true,
-    bound_tolerance::Real = 1e-6,
-    silent::Bool = true,
-    run_checks::Bool = true,
-    check_atol::Real = 1e-6,
-    check_rtol::Real = 1e-8,
+    kwargs...,
 )
+    o = isempty(kwargs) ? options : SolveOptions(options; kwargs...)
     validate(b)
-    optimizer === nothing || set_optimizer_factory!(b.model, optimizer)
-    sm, map = _build_model(
-        b, d; start_values = start_values, replace_nothing = replace_nothing, silent = silent)
+    sm, map = _build_model(b, d, o; start_values = start_values)
 
     JuMP.optimize!(sm)
     JuMP.assert_is_solved_and_feasible(sm)
@@ -224,11 +212,11 @@ function solve!(
 
     # Always computed, so the optimization path gets the report for free; only raised on the square
     # path, where an active bound means the system did not determine the answer.
-    d.meta.binding_bounds = _binding_bounds(b, d, bound_tolerance)
-    if check_binding_bounds && issquare(b) && !isempty(d.meta.binding_bounds)
+    d.meta.binding_bounds = _binding_bounds(b, d, o.bound_tolerance)
+    if o.check_binding_bounds && issquare(b) && !isempty(d.meta.binding_bounds)
         throw(BindingBoundError(d.meta.binding_bounds))
     end
-    run_checks && assert_checks(b, d; atol = check_atol, rtol = check_rtol)
+    o.run_checks && assert_checks(b, d; atol = o.check_atol, rtol = o.check_rtol)
     return d
 end
 

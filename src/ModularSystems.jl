@@ -1,15 +1,18 @@
 """
     ModularSystems
 
-Modular square systems of equations: equation blocks paired to the endogenous variables they
-determine, composed into a model, and solved.
+Economic models assembled from composable blocks of constraints, solved as square systems or as
+optimization problems.
+
+A [`Block`](@ref) is a collection of constraints over a JuMP model, each optionally paired with the
+variable it determines, together with the variables being solved for and an optional objective.
+Blocks compose with `+`; [`swap`](@ref) exchanges which variable an equation is understood to
+determine, which is how calibration reuses the behavioural equations unchanged. Data lives in a
+[`Dataset`](@ref), and [`solve`](@ref) applies one to the other.
 
 Built on JuMP: a model's state is a `JuMP.Model`, and blocks are a layer over its variables and
 constraints. See `docs/src/design.md` for the decisions behind this and `notes/TODO.md` for what is
 still open.
-
-So far this is [`Dataset`](@ref) and the model layout it sits on; blocks and solving are not written
-yet.
 """
 module ModularSystems
 
@@ -18,6 +21,7 @@ const MOI = JuMP.MOI
 
 include("layout.jl")
 include("dataset.jl")
+include("options.jl")
 include("group.jl")
 include("block.jl")
 include("solve.jl")
@@ -34,7 +38,7 @@ export VariableGroup
 export Block, Constraint, add_constraint!, set_unknowns!, set_objective!
 export unknowns, pairings, issquare, degrees_of_freedom, validate, assert_square!
 export solved_constraints, checked_constraints
-export solve, solve!, set_optimizer_factory!, BindingBoundError
+export solve, solve!, set_optimizer_factory!, BindingBoundError, SolveOptions
 export add_check!, assert_checks, CheckFailure
 export @block, @group
 export diagnose, Diagnosis, isclean, variables_in
@@ -46,8 +50,8 @@ export with_residuals, residual, residuals, has_residuals
 """
     ModularSystemsVersion() -> VersionNumber
 
-The version recorded in `Project.toml`. Exists so the package has one callable symbol before the
-real API lands; delete it once `Block` and friends exist.
+The version recorded in `Project.toml`, read from the file rather than baked in, so it cannot drift
+from what the package manager sees.
 
 # Examples
 ```jldoctest

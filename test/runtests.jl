@@ -12,6 +12,7 @@ using Test
 
     include("layout.jl")
     include("dataset.jl")
+    include("options.jl")
     include("group.jl")
     include("block.jl")
     include("solve.jl")
