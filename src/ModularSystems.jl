@@ -23,6 +23,8 @@ include("block.jl")
 include("solve.jl")
 include("macro.jl")
 include("diagnose.jl")
+include("tags.jl")
+include("indexset.jl")
 
 export ModularSystemsVersion
 export Dataset, SolveMetadata, set_bounds!, bounds, clear_bounds!
@@ -34,6 +36,8 @@ export solve, solve!, set_optimizer_factory!, BindingBoundError
 export add_check!, assert_checks, CheckFailure
 export @block, @group
 export diagnose, Diagnosis, isclean, variables_in
+export Tag, tag!, untag!, tags, has_tag, tagged, describe!, description
+export IndexSet, axisnames, select_axes, group_by
 
 """
     ModularSystemsVersion() -> VersionNumber

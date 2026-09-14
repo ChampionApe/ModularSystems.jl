@@ -19,4 +19,6 @@ using Test
     include("optimize.jl")
     include("compose.jl")
     include("diagnose.jl")
+    include("tags.jl")
+    include("indexset.jl")
 end

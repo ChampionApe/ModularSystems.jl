@@ -24,7 +24,8 @@ deliberately open.
 What exists: `Dataset` and the model layout, `VariableGroup`, `Block`, the `@block` and `@group`
 macros, and **both solve paths** — square, and optimization for a block carrying an objective — with
 bounds, the binding-bound check and `@check` evaluation. Blocks compose with `+`, and `diagnose` reports a
-system's shape. What does not exist: residuals (C7), swapping (C3), `IndexSet` and tags (I6). `notes/TODO.md` has the live
+system's shape. Tags and `IndexSet` work. What does not exist:
+residuals (C7) and endo-exo swapping (C3) — both waiting on a stated preference. `notes/TODO.md` has the live
 list.
 
 **Squareness is a predicate, not an invariant.** A block does not have to pair every constraint with
@@ -85,6 +86,12 @@ Julia 1.10.5 locally; `[compat]` declares `julia = "1.10"` and CI tests 1.10 and
   code that is easy to read, write and adjust while a model is being developed. When two designs are
   otherwise even, these decide. A design argued only on elegance does not beat one with a
   measurement behind it.
+- **Naming.** Types are `CamelCase`; enum values are `SCREAMING_CASE` (`SOLVED`, `CHECKED`).
+  Functions are lowercase: predicates follow Base and run the words together (`issquare`, `isclean`),
+  everything else separates them with underscores (`set_bounds!`, `degrees_of_freedom`,
+  `select_axes`). A function that mutates its first argument ends in `!`. Anything internal takes a
+  leading underscore (`_substitute`, `_parse_head`) and is never exported. A noun exported without a
+  verb is an accessor (`unknowns`, `pairings`, `bounds`, `tags`).
 - **The API is the product.** An exported symbol is a promise. Prefer exporting less and documenting
   it properly over exporting broadly; anything not exported can change freely. `checkdocs = :exports`
   means an export without a docstring fails the docs build — that is deliberate.

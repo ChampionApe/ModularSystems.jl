@@ -449,6 +449,13 @@ is therefore not reported.
 **The swap interface** (`notes/TODO.md` C3, narrowed). The semantics are settled; the surface is not — mutating or
 returning a new block, macro or function, and how cells are selected on each side.
 
+**Whether slices return views** (C12) and **a sparse notation layer** (C13) are both deferred
+deliberately rather than forgotten, each with the thing that would reopen it. C12 waits for a
+measurement showing that slice reads or writes are actually hot — `Window`, `prepare_selection` and a
+model-layout cache are a large surface to add on a guess. C13 waits for two or three real models: it
+is a pure ergonomics question, whether `x[p, i, t]` with gaps returning zero is worth a wrapper array
+when `x[k, t]` over an `IndexSet` already works.
+
 **Whether residuals stay** (C7). Auto-creating a residual per endogenous variable is a GAMS habit
 that buys real debugging power and doubles the variable count. It is meaningless for an unpaired
 constraint, so at most it is opt-in and paired-only.

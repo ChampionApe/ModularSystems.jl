@@ -36,15 +36,20 @@ tail, as the C3 decision predicted. A binding bound is recorded rather than rais
 tolerance had to be loosened to 1e-6: an interior-point solver stops slightly outside a bound, so a
 tolerance at solver precision detects nothing — pinned by a regression test.
 
-**I6. Implement tags.** `tag!` / `tagged` / `has_tag` and `describe!` / `description`, stored in
-`model.ext` and keyed on `VariableRef`, per the C8 decision. Not needed by the solve path, which is
-why it was not in I1–I5.
+**I6. ~~Implement tags.~~** Closed 2026-09-14. `src/tags.jl`: `tag!` / `untag!` / `tags` / `has_tag`
+/ `tagged`, and `describe!` / `description`, in `model.ext` and keyed on `VariableRef` so a tag
+applies to a cell and `tagged` can return a genuine `VariableGroup`. `JuMP.@variables` is untouched,
+and a test asserts it still accepts every declaration form.
+
+**I8. ~~Implement `IndexSet`.~~** Closed 2026-09-14. `src/indexset.jl`, with `select_axes` and
+`group_by`. Tests confirm it works as a JuMP axis with no scan, and that `group_by` replaces summing
+over one index of a sparse variable.
 
 I4 before I5 was the right call: two macro bugs (a pre-escaped body handed to
 `JuMP.@build_constraint`, and `_parse_head(nothing)`) were easy to localise because everything under
 them was already tested.
 
-Still not implemented: residuals (C7), swapping (C3), `IndexSet`, tags (I6).
+Still not implemented: residuals (C7) and swapping (C3) — both waiting on RKB's preference.
 
 ## Code and design
 
@@ -61,9 +66,9 @@ square-solver precondition, so the primitive is `fix`/`free` over a variable gro
 swap mutating or does it return a new block; macro or function; how cells are selected on each side.
 Done looks like: the signature written into `docs/src/design.md` with a worked calibration example.
 
-**C4. Decide the naming convention** for exported symbols, and write it into `CLAUDE.md` once. Cheap
-now, expensive after the API has users. Includes what replaces `square_model` — the model
-constructor can no longer be named for squareness.
+**C4. ~~Decide the naming convention.~~** Closed 2026-09-14, written into `CLAUDE.md`: `CamelCase`
+types, `SCREAMING_CASE` enum values, lowercase functions with predicates run together and everything
+else underscore-separated, `!` for mutation, leading underscore for internals.
 
 **C5. ~~Design the `@block` grammar.~~** Closed 2026-09-14: a comma-separated head pairs a constraint
 with a variable, `[i ∈ I], expr` is the unpaired indexed form, `@check` takes its constraint as an
@@ -101,16 +106,14 @@ an additive-identity sentinel they do not define.
 the solver, plus a `file:line` source recorded by `@block` on every entry, which is what `diagnose`
 and a failed `@check` report. Reasoning in `docs/src/design.md`.
 
-**C12. Decide whether slices return views.** SquareModels' `Window` makes `data[x[2025:2060]]` a view
-that keeps model indices, which is what makes slices usable for printing and plotting, and it brings
-`prepare_selection`, `refresh_model_layout!` and a caching layer with it. The recommendation stands:
-refuse it until something demands it, and work with plain reads and broadcast assignment first. Open
-so that it is refused deliberately rather than forgotten.
+**C12. ~~Decide whether slices return views.~~** Deferred deliberately 2026-09-14. Plain reads and
+broadcast assignment are enough so far; `Window`, `prepare_selection` and a model-layout cache are a
+large surface to add on a guess. Reopen when a measurement shows slice access is hot.
 
-**C13. Decide whether to add a sparse *notation* layer.** All that remains of the old C10: whether
-`x[p, i, t]` with gaps returning zero is worth a wrapper array on top of coordinate axes, given that
-`x[k, t]` already works. Pure ergonomics, and better judged with two or three real models in hand.
-Deferred deliberately; the C10 constraints keep it addable as a package extension.
+**C13. ~~Decide whether to add a sparse notation layer.~~** Deferred deliberately 2026-09-14.
+`IndexSet` plus coordinate axes covers the capability; whether `x[p, i, t]` with gaps returning zero
+is worth a wrapper array is ergonomics, and better judged against two or three real models. The C10
+constraints keep it addable as a package extension.
 
 ## Documentation
 
