@@ -34,6 +34,7 @@ include("swap.jl")
 include("residuals.jl")
 include("problem.jl")
 include("spec.jl")
+include("fixedpoint.jl")
 
 export ModularSystemsVersion
 export Dataset, SolveMetadata, set_bounds!, bounds, clear_bounds!
@@ -54,6 +55,7 @@ export swap, endogenize, exogenize
 export with_residuals, residual, residuals, has_residuals
 export Problem, StructuralError, assert_solvable
 export ModelSpec, register!, unregister!, modes, ready
+export fixed_point!, ConvergenceReport, ConvergenceFailure
 
 """
     ModularSystemsVersion() -> VersionNumber

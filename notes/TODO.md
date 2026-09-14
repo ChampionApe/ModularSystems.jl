@@ -150,13 +150,28 @@ infeasible at 1,000. A residual check does **not** catch it, because both answer
 absolute tolerance. Reasoning and tables in `archive/decompositionMeasurements.md` §7; the
 consequence is in `BlockTriangular`'s docstring.
 
-**C19. Soft-linked models: iterative coupling between separate models.** Open, raised by RKB
-2026-09-14. Two models solved in alternation, each consuming the other's last answer, until the
-exchanged quantities stop moving. The open question is whether this needs any structure at all
-beyond a loop over two `Problem`s plus a convergence test — and if it does, whether that structure
-is a type or a documented workflow. C18 is directly relevant: a soft link that stops after one pass
-is exactly the hand-the-answer-on-as-exact failure, so whatever is built has to make the
-convergence test hard to skip.
+**C19. ~~Soft-linked models: iterative coupling between separate models.~~** Closed 2026-09-14,
+raised by RKB the same day. Answered by writing one out by hand first (`examples/softLink.jl`):
+cross-model transfer needs **nothing** — it is `dest[v] = src[w]`, and `Dataset` already refuses a
+foreign variable — and a `Coupling` type would buy nothing over an assignment. What needed building
+was the loop, because every individual solve in a diverging link succeeds and reports success, so a
+loop that runs out of passes and returns its last values is a wrong answer with no symptom.
+`fixed_point!` raises. Reasoning in `docs/src/design.md`.
+
+**C20. Composable modes across orthogonal axes.** Open. RKB chose "start enumerable, allow
+composition"; only the enumerable half is built. The registry handles a handful of named modes well,
+but a model whose states are a *product* — {static, dynamic} × {calibration, baseline} × {linked,
+unlinked} — would need eight registrations of six ingredients. `examples/multiModeModel.jl` is at
+exactly the size where this starts to show: it builds six block variables by hand to make five modes.
+The candidate is a mode as a composable transformation (block selection, endo/exo change, options
+overlay) rather than a finished `Problem`. Not obviously worth it — judge it against a model with
+more than one orthogonal axis, which the current example does not have.
+
+**C21. Index-restricted modes.** Open. "Solve periods 1–10 only", or one region of a multi-region
+model, is a real modelling need with no answer in the package. `examples/multiModeModel.jl` sidesteps
+it by writing two different closure blocks (`accumulation` and `steady`), which works but does not
+generalise: it cannot express *the same* block over a subset of its index set. `IndexSet` is the
+obvious raw material. Related to C20, since a horizon is another orthogonal axis.
 
 ## Documentation
 

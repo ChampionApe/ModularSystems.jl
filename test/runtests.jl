@@ -26,4 +26,5 @@ using Test
     include("swap.jl")
     include("residuals.jl")
     include("problem.jl")
+    include("fixedpoint.jl")
 end

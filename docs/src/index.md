@@ -495,6 +495,53 @@ working with is a variable in your own code, not hidden state in the model.
 `examples/multiModeModel.jl` runs the whole story end to end — two calibrations, linked and unlinked
 baselines, and a shock — on a two-sector model with an energy satellite.
 
+## Soft-linking separate models
+
+Sometimes two models cannot be made one. A macro model and a bottom-up energy model are maintained by
+different people at different granularity, and neither can be pasted into the other — so they are
+coupled by a handful of quantities instead, solved in alternation until neither changes what it hands
+over.
+
+Almost none of that needs the package. Passing a value across is a read of one dataset and a write to
+another:
+
+```julia
+energy_data[q[s]] = macro_data[E[s]]
+```
+
+and a `Dataset` refuses a variable belonging to the wrong model, so a mis-wired coupling raises rather
+than producing a plausible number. The models themselves are ordinary [`Problem`](@ref)s.
+
+What does need help is the loop, and only because of how it fails. **Every individual solve in a
+diverging soft link converges and reports success** — each model answers the question it was given
+perfectly well, and the pair never agrees. There is no other symptom, so a loop that runs out of
+iterations and returns its last values hands back numbers that look exactly like a solution.
+[`fixed_point!`](@ref) raises instead:
+
+```julia
+report = fixed_point!([macro_data => pe]) do
+    solve!(macro_problem)
+    for s in S
+        energy_data[q[s]] = macro_data[E[s]]
+    end
+    solve!(energy_problem)
+    macro_data[pe] = energy_data[price]
+end
+```
+
+The list is the cells that carry information **between** passes — the feedback, whose value at the
+start of a pass determines that pass. `q[s]` is transferred too, but a transfer overwrites it before
+anything reads it, so it carries no state and is not what the loop is converging.
+
+`damping` moves each exchanged cell only part of the way to its new value, which is what settles two
+models that overshoot each other. It fixes overshoot and not expansion: if the change alternates in
+sign, damping will help; if the link walks away in one direction, no admissible amount of damping
+brings it back and the coupling itself is wrong. A failure carries its `history`, which tells the two
+apart.
+
+`examples/softLink.jl` shows a link that settles, the same link made steep enough that it will not,
+and damping fixing it.
+
 ## When a solve raises
 
 Five failures have names, because each means something different and calls for a different fix.
@@ -505,6 +552,7 @@ Five failures have names, because each means something different and calls for a
 | [`BindingBoundError`](@ref) | a bound is active at the solution of a **square** system, so the equations did not determine the answer. Never raised on the optimization path, where an active bound is expected. |
 | [`CheckFailure`](@ref) | a `@check` constraint did not hold at the solution. Carries each failing check and the gap it missed by. |
 | [`SubSystemFailure`](@ref) | a subsystem failed during a [`BlockTriangular`](@ref) solve. Names which one and what it was solving for; everything before it succeeded, so the dataset holds those results. |
+| [`ConvergenceFailure`](@ref) | soft-linked models did not settle. Carries the history, which says whether they were diverging or merely slow. |
 | `ArgumentError` | the request itself does not make sense — an exogenous variable with no value, an empty bound interval, a block declared square that is not. |
 
 The first four are the package refusing to hand back a plausible wrong answer. That is the thing it is

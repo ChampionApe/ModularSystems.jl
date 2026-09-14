@@ -609,6 +609,46 @@ state" flag. That would cut against every other decision here — `swap`, `endog
 all non-mutating — and it is the thing that makes a script's behaviour depend on lines that ran
 earlier somewhere else.
 
+### Soft-linking needs a loop, not a coupling type
+
+*Decided 2026-09-14 — `notes/TODO.md` C19.*
+
+Two models maintained separately, coupled by a few exchanged quantities and solved in alternation.
+The question was what structure this needs, and it was answered by writing one out by hand first
+(`examples/softLink.jl`) rather than by designing.
+
+**Cross-model transfer needs nothing.** `energy_data[q[s]] = macro_data[E[s]]` is a read of one
+dataset and a write to another, and `Dataset` already refuses a variable belonging to the wrong model
+— so a mis-wired coupling raises instead of returning a plausible number. A `Coupling` type holding
+pairs of variables was considered and is not worth its own existence: it would buy nothing over an
+assignment, and it would have to grow a transform argument the moment a coupling aggregates or
+converts units, at which point a plain function is simpler than any signature.
+
+**The loop does need help, because of how it fails.** Every individual solve in a diverging soft link
+converges and reports success — each model answers the question it was handed, and the pair never
+agrees. There is no symptom anywhere except that the exchanged quantities keep moving. A loop that
+runs out of iterations and returns its last values is therefore a wrong answer delivered quietly,
+which is the one failure mode this package is consistent about refusing. `fixed_point!` raises, with
+`raise = false` for the case where the history is what is wanted.
+
+This is the same lesson as C18 one level up. There, a cascade handed each subsystem's answer to the
+next as exact and had no way to revisit it; here, a single pass hands one model's answer to the other
+and stopping there is the identical mistake. The convergence test is what makes the difference, so it
+is not optional.
+
+**What is converged is the feedback, not everything transferred.** `exchanged` lists the cells whose
+value at the *start* of a pass determines that pass. A quantity that a transfer overwrites before
+anything reads it carries no state between passes; damping it would be undone immediately, and
+including it in the convergence test measures something that was going to be overwritten anyway.
+
+**Damping fixes overshoot, not expansion**, and the docstring says so because the distinction is not
+obvious and the failure is silent. If a pass multiplies the error by `m`, damping makes it
+`(1 - damping)·m + damping`. For `m < -1` — the models leapfrogging, the change alternating in sign —
+some damping brings it inside `(-1, 1)`. For `m > 1` it does not, for any admissible value: a link
+that walks away in one direction is miscoupled rather than under-damped. Both cases are pinned by
+tests, the second precisely because a user will otherwise reach for damping and conclude the package
+is at fault.
+
 ## Open
 
 **Whether slices return views** (C12) and **a sparse notation layer** (C13) are both deferred
