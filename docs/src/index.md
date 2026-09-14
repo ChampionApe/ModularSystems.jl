@@ -98,6 +98,50 @@ julia> round(multipliers[L[2]], digits = 4)
 Arithmetic works on values and returns a value-only dataset: bounds and solve metadata are dropped,
 because a ratio of two scenarios is not itself a scenario.
 
+## Solve settings
+
+`replace_nothing = 1.0` above is one of a handful of settings a solve takes. Retyping them at every
+call site is how two solves end up differing by a keyword nobody meant to change, so they can be
+named as a value:
+
+```jldoctest quickstart
+julia> opts = SolveOptions(replace_nothing = 1.0)
+SolveOptions(replace_nothing = 1.0)
+
+julia> round(solve(block, data; options = opts)[L[1]], digits = 2)
+3200.0
+```
+
+Printing shows only what differs from the defaults, which is the part worth reading. Derive a variant
+rather than rebuilding one, so the two cannot drift apart:
+
+```jldoctest quickstart
+julia> loud = SolveOptions(opts; silent = false);
+
+julia> (loud.replace_nothing, loud.silent)
+(1.0, false)
+```
+
+Every field of [`SolveOptions`](@ref) is also accepted directly as a keyword of [`solve`](@ref), where
+it overrides the options passed alongside it — so `solve(block, data; options = opts, silent = false)`
+and the `loud` above mean the same thing.
+
+`SolveOptions` holds nothing belonging to a particular model, which is what makes one set reusable
+across models and scenarios. Starting values are a `Dataset` and therefore data, so they stay a
+keyword of their own:
+
+```jldoctest quickstart
+julia> solved = solve(block, data; options = opts, start_values = baseline);
+
+julia> round(solved[w[1]], digits = 2)
+32.0
+```
+
+Two solvers, two scopes. [`set_optimizer_factory!`](@ref) sets a model's default, as in the
+quickstart. `optimizer` inside `SolveOptions` names the solver for **that solve only** and does not
+attach itself to the model — which is what lets a calibration use different solver settings from the
+baseline it feeds.
+
 ## When the system is not square
 
 A block may instead carry an objective, and is then solved as an optimization problem. Nothing else
@@ -287,10 +331,173 @@ julia> report.square
 true
 ```
 
-It names three things that would otherwise surface as an unexplained solver failure: constraints left
-with no unknown once exogenous values are substituted, unknowns appearing in no constraint and no
-objective, and exogenous variables with no value. A `@block` entry records where it was written, so
-an unpaired constraint — which has no variable name to be called by — is still identifiable.
+It names five things that would otherwise surface as an unexplained solver failure. Three are found by
+looking at each constraint in turn: constraints left with no unknown once exogenous values are
+substituted (`trivial`), unknowns appearing in no constraint and no objective (`orphans`), and
+exogenous variables with no value (`missing_values`). A `@block` entry records where it was written,
+so an unpaired constraint — which has no variable name to be called by — is still identifiable.
+
+The other two need the [decomposition](@ref Decomposition) below, and are the ones a count cannot
+find. Here two equations determine the same variable and another unknown is left with nothing:
+
+```jldoctest quickstart
+julia> @variable(model, lonely);
+
+julia> duplicated = @block model begin
+           @unknowns L, lonely
+           L[j in J],  L[j] == rho[j] * N[j]
+           [i in 1:1], 2 * L[1] == 2 * rho[1] * N[1]
+       end;
+
+julia> bad = diagnose(duplicated, data);
+
+julia> bad.degrees_of_freedom      # three unknowns, three equations
+0
+
+julia> isclean(bad)
+false
+
+julia> [i for (i, _) in bad.contested]
+2-element Vector{Int64}:
+ 1
+ 3
+```
+
+`contested` lists equations left with no variable to determine, because everything they could have
+determined is already spoken for. `undetermined` is its mirror: unknowns that *do* appear in
+equations, but where every equation that could have determined them is determining something else.
+
+`undetermined` is kept separate from `orphans` because they are different bugs. An orphan appears in
+no equation at all, which is almost always a typo. An undetermined unknown appears in equations that
+have been taken by something else, which is a modelling error — and the fix is a different one.
+
+The counts say nothing is wrong here: three unknowns, three equations, zero degrees of freedom. Only
+the structure shows that one equation was written twice and `lonely` is determined by nothing.
+
+## Decomposition
+
+A square block pairs each equation with the variable it determines. Read as a graph, that pairing is
+a **perfect matching**, and a matching is what a system needs to be split into the smallest groups of
+equations that must be solved together:
+
+```jldoctest quickstart
+julia> dec = decompose(whole)
+Decomposition(4 subsystems, largest 1)
+
+julia> iswelldetermined(dec)
+true
+
+julia> largest_subsystem(dec)
+1
+```
+
+[`subsystems`](@ref) come back in **solve order**, whatever order the equations were written in: each
+one's inputs are determined by the ones before it. [`largest_subsystem`](@ref) is the size of the
+biggest group that has to be solved simultaneously — 1 here, because nothing in `whole` is mutually
+determined.
+
+Where the pairings are missing or do not cover the unknowns, a maximum matching is computed instead,
+and [`overdetermined`](@ref) and [`underdetermined`](@ref) name the parts that are left over. That is
+where `contested` and `undetermined` above come from.
+
+`decompose` is cheap — a few microseconds per unknown, about a thousandth of the cost of solving — so
+it is meant to be used freely while a model is being built.
+
+### Solving one subsystem at a time
+
+[`BlockTriangular`](@ref) solves each subsystem in turn, each reading the results of the ones before
+it out of the dataset:
+
+```jldoctest quickstart
+julia> round(solve(block, data; options = opts, strategy = BlockTriangular())[L[1]], digits = 2)
+3200.0
+```
+
+!!! warning "It is slower, and that is measured"
+    This is **not** a speed optimisation. It is 2× to 110× *slower* than the default
+    [`Monolithic`](@ref) across model sizes up to 21,500 unknowns. Entering an interior-point solver
+    costs about the same whatever the problem size, and a one- or two-variable subsystem cannot
+    amortise that: Ipopt's summed time over 400 tiny subsystems was 0.99 s against 0.004 s for the
+    same system solved at once.
+
+    What it buys is **convergence**. Every subsystem starts from the results of the ones before it,
+    where a monolithic solve starts from whatever was supplied for everything at once. Reach for it
+    when a solve will not converge, not to make one faster.
+
+It refuses rather than guessing: a block with an objective, one that is over- or under-determined, or
+one carrying a solved *inequality* — which determines nothing, so it belongs to no subsystem — raises
+instead of quietly solving a different problem.
+
+## Problems and modes
+
+A model is never solved one way. It is calibrated, run as a baseline, shocked; its satellite modules
+are sometimes linked in and sometimes held exogenous. Each of those is a block, a dataset and some
+settings — and `solve(block, data)` will accept any pairing of them, meaningful or not.
+
+A [`Problem`](@ref) is one pairing that means something:
+
+```jldoctest quickstart
+julia> p = Problem(whole, data; options = opts)
+Problem(4 constraints, 4 unknowns)
+
+julia> round(solve(p)[w[2]], digits = 2)
+10.0
+```
+
+A shock is a baseline with something different about it, so derive rather than rebuild:
+
+```julia
+shock = Problem(baseline_problem; data = shocked, start = baseline)
+```
+
+The constructor checks the **block** — see [`assert_solvable`](@ref) — and deliberately not the data.
+A block is a value and cannot change underneath the problem, so a guarantee about it holds. A
+`Dataset` is mutable by design, since a scenario *is* a dataset that gets edited, so a check on the
+data taken at construction would be stale exactly when it mattered. Missing data is caught at solve
+time instead, where it is still exact.
+
+A [`ModelSpec`](@ref) collects the named modes:
+
+```jldoctest quickstart
+julia> spec = ModelSpec(model);
+
+julia> register!(spec, :baseline, p; about = "forward run");
+
+julia> modes(spec)
+1-element Vector{Symbol}:
+ :baseline
+
+julia> ready(spec)
+1-element Vector{Symbol}:
+ :baseline
+```
+
+[`ready`](@ref) is how a workflow's ordering is expressed here, and it is **derived, not declared**: a
+calibration comes before the baseline that consumes its output because the baseline's parameters are
+not in the data until the calibration has run. Nobody writes that down, so nobody can write it down
+wrongly. `diagnose(spec)` says *why* a mode is not ready, and displaying a spec shows it per mode.
+
+There is deliberately no dependency graph and no "current mode". Modes are values; the one you are
+working with is a variable in your own code, not hidden state in the model.
+
+`examples/multiModeModel.jl` runs the whole story end to end — two calibrations, linked and unlinked
+baselines, and a shock — on a two-sector model with an energy satellite.
+
+## When a solve raises
+
+Five failures have names, because each means something different and calls for a different fix.
+
+| raised by | means |
+|---|---|
+| [`StructuralError`](@ref) | the block cannot be solved whatever the data says. Carries the [`Diagnosis`](@ref) that found it. |
+| [`BindingBoundError`](@ref) | a bound is active at the solution of a **square** system, so the equations did not determine the answer. Never raised on the optimization path, where an active bound is expected. |
+| [`CheckFailure`](@ref) | a `@check` constraint did not hold at the solution. Carries each failing check and the gap it missed by. |
+| [`SubSystemFailure`](@ref) | a subsystem failed during a [`BlockTriangular`](@ref) solve. Names which one and what it was solving for; everything before it succeeded, so the dataset holds those results. |
+| `ArgumentError` | the request itself does not make sense — an exogenous variable with no value, an empty bound interval, a block declared square that is not. |
+
+The first four are the package refusing to hand back a plausible wrong answer. That is the thing it is
+most careful about: a solver reporting success on a problem that is not the one you asked about is
+worse than an interruption.
 
 ## Tags and descriptions
 
