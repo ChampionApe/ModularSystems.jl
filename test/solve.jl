@@ -229,4 +229,147 @@
         scenario = solve(behavioural, calibrated; replace_nothing = 1.0)
         @test scenario[y] ≈ 10.0
     end
+
+    # -----------------------------------------------------------------------------------------
+    # Solving one subsystem at a time
+    # -----------------------------------------------------------------------------------------
+
+    # A recursive chain with a nonlinear tail: z depends on x and y, w on z, and nothing is
+    # simultaneous, so it decomposes to four scalar subsystems.
+    function cascade()
+        m = Model()
+        set_optimizer_factory!(m, optimizer_with_attributes(Ipopt.Optimizer, "sb" => "yes"))
+        @variable(m, a)
+        @variable(m, x)
+        @variable(m, y)
+        @variable(m, z)
+        @variable(m, w)
+        b = @block m begin
+            @square
+            z, z == y * x
+            x, x == a + 1
+            y, y == x + 1
+            w, w * w + w == z + 12
+        end
+        d = Dataset(m)
+        d[a] = 2.0
+        return b, d, (x = x, y = y, z = z, w = w)
+    end
+
+    @testset "block-triangular gives the same answer as monolithic" begin
+        b, d, v = cascade()
+        mono = solve(b, d; replace_nothing = 1.0)
+        tri = solve(b, d; replace_nothing = 1.0, strategy = BlockTriangular())
+        for name in (:x, :y, :z, :w)
+            @test mono[v[name]] ≈ tri[v[name]] atol = 1e-8
+        end
+        @test tri[v.x] ≈ 3.0
+        @test tri[v.z] ≈ 12.0
+    end
+
+    @testset "the strategy travels in the options like any other setting" begin
+        b, d, v = cascade()
+        opts = SolveOptions(replace_nothing = 1.0, strategy = BlockTriangular())
+        @test solve(b, d; options = opts)[v.z] ≈ 12.0
+        # and a keyword still overrides it
+        @test solve(b, d; options = opts, strategy = Monolithic())[v.z] ≈ 12.0
+    end
+
+    @testset "a subsystem solve records the total time and a termination status" begin
+        b, d, _ = cascade()
+        tri = solve(b, d; replace_nothing = 1.0, strategy = BlockTriangular())
+        @test tri.meta.termination_status !== nothing
+        @test tri.meta.solve_time >= 0
+        @test tri.meta.objective_value === nothing
+    end
+
+    @testset "checks and binding bounds still apply across the whole block" begin
+        b, d, v = cascade()
+        add_check!(b, @build_constraint(v.z == 0), "z is zero")
+        @test_throws CheckFailure solve(b, d; replace_nothing = 1.0,
+                                        strategy = BlockTriangular())
+
+        # x solves to exactly 3, so an upper bound of 3 is *binding* rather than infeasible: the
+        # solver succeeds and lands on it, which is the case the diagnostic exists for. The check
+        # runs once over the whole block after the last subsystem, so it still sees this.
+        b2, d2, v2 = cascade()
+        set_bounds!(d2, v2.x; upper = 3.0)
+        @test_throws BindingBoundError solve(b2, d2; replace_nothing = 1.0,
+                                             strategy = BlockTriangular())
+    end
+
+    @testset "an infeasible subsystem is reported against that subsystem" begin
+        # The same bound tightened past the solution makes subsystem 1 genuinely infeasible.
+        # Monolithically that is an infeasibility over the whole system; here it names x.
+        b, d, v = cascade()
+        set_bounds!(d, v.x; upper = 2.0)
+        e = try
+            solve(b, d; replace_nothing = 1.0, strategy = BlockTriangular())
+        catch err
+            err
+        end
+        @test e isa SubSystemFailure
+        @test JuMP.name(only(e.variables)) == "x"
+        @test e.position == 1
+    end
+
+    @testset "a deficient block refuses to be solved subsystem by subsystem" begin
+        m = Model()
+        set_optimizer_factory!(m, Ipopt.Optimizer)
+        @variable(m, x)
+        @variable(m, y)
+        b = Block(m)
+        add_constraint!(b, @build_constraint(x == 1))
+        set_unknowns!(b, x, y)
+        d = Dataset(m)
+        e = try
+            solve(b, d; replace_nothing = 1.0, strategy = BlockTriangular())
+        catch err
+            err
+        end
+        @test e isa ArgumentError
+        @test occursin("underdetermined", e.msg)
+        @test occursin("y", e.msg)
+    end
+
+    @testset "a failing subsystem says which one it was" begin
+        # x solves fine; y is then asked for a real square root of a negative number, with a bound
+        # keeping it away from any complex escape. The failure must name y rather than the block.
+        m = Model()
+        set_optimizer_factory!(m, optimizer_with_attributes(Ipopt.Optimizer, "sb" => "yes",
+                                                            "max_iter" => 20))
+        @variable(m, x)
+        @variable(m, y >= 1)
+        b = @block m begin
+            @square
+            x, x == 4
+            y, y * y == -x
+        end
+        d = Dataset(m)
+        e = try
+            solve(b, d; replace_nothing = 1.0, strategy = BlockTriangular())
+        catch err
+            err
+        end
+        @test e isa SubSystemFailure
+        @test e.position == 2
+        @test e.total == 2
+        @test JuMP.name(only(e.variables)) == "y"
+        @test occursin("subsystem 2 of 2", sprint(showerror, e))
+        @test occursin("y", sprint(showerror, e))
+    end
+
+    @testset "an objective cannot be solved by subsystems" begin
+        m = Model()
+        set_optimizer_factory!(m, optimizer_with_attributes(Ipopt.Optimizer, "sb" => "yes"))
+        @variable(m, x)
+        b = @block m begin
+            @unknowns x
+            @objective Min (x - 2)^2
+            x >= 0
+        end
+        d = Dataset(m)
+        @test_throws ArgumentError solve(b, d; replace_nothing = 1.0,
+                                         strategy = BlockTriangular())
+    end
 end

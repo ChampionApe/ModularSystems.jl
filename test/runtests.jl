@@ -20,6 +20,7 @@ using Test
     include("optimize.jl")
     include("compose.jl")
     include("diagnose.jl")
+    include("decompose.jl")
     include("tags.jl")
     include("indexset.jl")
     include("swap.jl")

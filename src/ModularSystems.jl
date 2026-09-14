@@ -24,6 +24,7 @@ include("dataset.jl")
 include("options.jl")
 include("group.jl")
 include("block.jl")
+include("decompose.jl")
 include("solve.jl")
 include("macro.jl")
 include("diagnose.jl")
@@ -39,9 +40,12 @@ export Block, Constraint, add_constraint!, set_unknowns!, set_objective!
 export unknowns, pairings, issquare, degrees_of_freedom, validate, assert_square!
 export solved_constraints, checked_constraints
 export solve, solve!, set_optimizer_factory!, BindingBoundError, SolveOptions
+export SolveStrategy, Monolithic, BlockTriangular, SubSystemFailure
 export add_check!, assert_checks, CheckFailure
 export @block, @group
 export diagnose, Diagnosis, isclean, variables_in
+export decompose, Decomposition, SubSystem, subsystems, overdetermined,
+       underdetermined, iswelldetermined, largest_subsystem
 export Tag, tag!, untag!, tags, has_tag, tagged, describe!, description
 export IndexSet, axisnames, select_axes, group_by
 export swap, endogenize, exogenize

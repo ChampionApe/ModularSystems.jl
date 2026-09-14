@@ -197,18 +197,11 @@ function solve!(
 )
     o = isempty(kwargs) ? options : SolveOptions(options; kwargs...)
     validate(b)
-    sm, map = _build_model(b, d, o; start_values = start_values)
 
-    JuMP.optimize!(sm)
-    JuMP.assert_is_solved_and_feasible(sm)
-
-    for (v, sv) in map
-        d[v] = JuMP.value(sv)
-    end
-
-    d.meta.termination_status = JuMP.termination_status(sm)
-    d.meta.solve_time = JuMP.solve_time(sm)
-    d.meta.objective_value = b.objective === nothing ? nothing : JuMP.objective_value(sm)
+    status, time, objective = _run(o.strategy, b, d, o, start_values)
+    d.meta.termination_status = status
+    d.meta.solve_time = time
+    d.meta.objective_value = objective
 
     # Always computed, so the optimization path gets the report for free; only raised on the square
     # path, where an active bound means the system did not determine the answer.
@@ -218,6 +211,102 @@ function solve!(
     end
     o.run_checks && assert_checks(b, d; atol = o.check_atol, rtol = o.check_rtol)
     return d
+end
+
+# ---------------------------------------------------------------------------------------------
+# Strategies
+# ---------------------------------------------------------------------------------------------
+
+# Build, optimize, write back. Both strategies go through here, so the substitution and write-back
+# spine is shared and a subsystem solve is an ordinary solve over a smaller block.
+function _run_one!(b::Block, d::Dataset, o::SolveOptions, start_values)
+    sm, map = _build_model(b, d, o; start_values = start_values)
+    JuMP.optimize!(sm)
+    JuMP.assert_is_solved_and_feasible(sm)
+    for (v, sv) in map
+        d[v] = JuMP.value(sv)
+    end
+    return sm
+end
+
+function _run(::Monolithic, b::Block, d::Dataset, o::SolveOptions, start_values)
+    sm = _run_one!(b, d, o, start_values)
+    return (JuMP.termination_status(sm),
+            JuMP.solve_time(sm),
+            b.objective === nothing ? nothing : JuMP.objective_value(sm))
+end
+
+"""
+    SubSystemFailure
+
+Raised when a subsystem fails during a [`BlockTriangular`](@ref) solve. Names the position in the
+solve order and the variables that subsystem determines, which a bare solver infeasibility does not:
+on this path the failing subsystem is usually small, and knowing which one it is, is most of the
+diagnosis.
+"""
+struct SubSystemFailure <: Exception
+    position::Int
+    total::Int
+    variables::Vector{VariableRef}
+    cause::Exception
+end
+
+function Base.showerror(io::IO, e::SubSystemFailure)
+    print(io, "SubSystemFailure: subsystem ", e.position, " of ", e.total,
+              " failed, solving for ", length(e.variables),
+              length(e.variables) == 1 ? " variable" : " variables", ":\n  ")
+    shown = min(length(e.variables), 10)
+    print(io, join((JuMP.name(v) for v in e.variables[1:shown]), ", "))
+    shown < length(e.variables) && print(io, ", … (", length(e.variables) - shown, " more)")
+    print(io, "\nEverything before it solved, so the dataset holds those results. The cause was:\n")
+    showerror(io, e.cause)
+end
+
+# A subsystem is solved as an ordinary block over the same model and the same dataset: its inputs are
+# not unknowns of it, so they are substituted from `d` — which the preceding subsystems have already
+# written into. The cascade needs no mechanism of its own.
+function _subblock(b::Block, s::SubSystem)
+    cons = b.constraints[s.constraints]
+    vars = Set(s.variables)
+    paired = Set{VariableRef}(
+        c.determines for c in cons if is_paired(c) && c.determines in vars)
+    return Block(b.model, cons, paired, VariableGroup(b.model, s.variables), nothing, false)
+end
+
+function _run(::BlockTriangular, b::Block, d::Dataset, o::SolveOptions, start_values)
+    dec = decompose(b)
+    iswelldetermined(dec) || throw(ArgumentError(
+        "cannot solve this block one subsystem at a time: " * _deficiency_message(dec) *
+        ". Use diagnose to see the whole picture, or solve it monolithically."))
+
+    total = 0.0
+    status = nothing
+    n = length(subsystems(dec))
+    for (k, s) in enumerate(subsystems(dec))
+        sm = try
+            _run_one!(_subblock(b, s), d, o, start_values)
+        catch err
+            err isa Exception || rethrow()
+            throw(SubSystemFailure(k, n, s.variables, err))
+        end
+        total += JuMP.solve_time(sm)
+        status = JuMP.termination_status(sm)
+    end
+    return (status, total, nothing)
+end
+
+function _deficiency_message(dec::Decomposition)
+    parts = String[]
+    over = overdetermined(dec)
+    under = underdetermined(dec)
+    isempty(over) || push!(parts, string(
+        length(over.constraints), " equations are overdetermined, competing for ",
+        length(over.variables), " variables"))
+    isempty(under) || push!(parts, string(
+        length(under.variables), " variables are underdetermined (",
+        join((JuMP.name(v) for v in Iterators.take(under.variables, 5)), ", "),
+        length(under.variables) > 5 ? ", …)" : ")"))
+    return join(parts, " and ")
 end
 
 """

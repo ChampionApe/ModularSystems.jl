@@ -1,6 +1,40 @@
 # Solve settings as a value, separate from the data they are applied to.
 
 """
+    SolveStrategy
+
+How a block is handed to the solver. The choice changes nothing about the answer, only the work done
+to reach it, so it belongs with the settings rather than with the model.
+
+Subtypes are [`Monolithic`](@ref) and [`BlockTriangular`](@ref).
+"""
+abstract type SolveStrategy end
+
+"""
+    Monolithic()
+
+Solve every unknown at once in a single intermediate model. The default, and the only strategy that
+applies to a block carrying an objective.
+"""
+struct Monolithic <: SolveStrategy end
+
+"""
+    BlockTriangular()
+
+Solve the block one subsystem at a time, in the order [`decompose`](@ref) finds, each subsystem
+reading the results of the ones before it out of the dataset.
+
+The answer is the same as [`Monolithic`](@ref); what changes is that a system of \$n\$ unknowns
+becomes a sequence of much smaller ones, which is worth doing exactly when
+[`largest_subsystem`](@ref) is well below the size of the block.
+
+Requires a structurally sound square system: a block with an objective, or one whose decomposition
+has an over- or under-determined part, raises rather than solving something adjacent to what was
+asked.
+"""
+struct BlockTriangular <: SolveStrategy end
+
+"""
     SolveOptions(; kwargs...)
     SolveOptions(base::SolveOptions; kwargs...)
 
@@ -23,6 +57,8 @@ which is why they are not here.
   solver's own bound relaxation; see `notes/crossCuttingFindings.md` #1.
 - `silent`: suppress solver output.
 - `run_checks`, `check_atol`, `check_rtol`: evaluate `@check` constraints against the solution.
+- `strategy::SolveStrategy`: [`Monolithic`](@ref) or [`BlockTriangular`](@ref). The answer does not
+  depend on it, only the work done to reach it.
 
 # Examples
 ```jldoctest
@@ -43,6 +79,7 @@ struct SolveOptions
     run_checks::Bool
     check_atol::Float64
     check_rtol::Float64
+    strategy::SolveStrategy
 end
 
 SolveOptions(;
@@ -54,8 +91,9 @@ SolveOptions(;
     run_checks::Bool = true,
     check_atol::Real = 1e-6,
     check_rtol::Real = 1e-8,
+    strategy::SolveStrategy = Monolithic(),
 ) = SolveOptions(optimizer, replace_nothing, check_binding_bounds, bound_tolerance,
-                 silent, run_checks, check_atol, check_rtol)
+                 silent, run_checks, check_atol, check_rtol, strategy)
 
 # Built by field name rather than by listing them, so adding a field cannot leave the derive
 # constructor silently dropping it.
