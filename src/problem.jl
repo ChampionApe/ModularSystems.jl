@@ -47,7 +47,7 @@ function assert_solvable(b::Block, d::Union{Nothing,Dataset} = nothing)
 end
 
 """
-    Problem(block, data; start = nothing, options = SolveOptions())
+    Problem(block, data; start = nothing, options = SolveOptions(), strategy = Monolithic())
     Problem(base::Problem; kwargs...)
 
 A block, the dataset it is solved against, where it starts from and how it is solved — one named
@@ -67,7 +67,7 @@ shock = Problem(baseline; data = edited, start = baseline_solution)
 ```
 
 # Fields
-Read them directly — `p.block`, `p.data`, `p.start`, `p.options`. There are deliberately no exported
+Read them directly — `p.block`, `p.data`, `p.start`, `p.options`, `p.strategy`. There are no exported
 accessors: `data` and `options` are names a user is very likely to want for their own variables, and
 an exported function makes that assignment an error rather than a shadow. See
 `notes/crossCuttingFindings.md` #2.
@@ -99,18 +99,20 @@ struct Problem
     data::Dataset
     start::Union{Nothing,Dataset}
     options::SolveOptions
+    strategy::SolveStrategy
 end
 
 function Problem(block::Block, data::Dataset;
                  start::Union{Nothing,Dataset} = nothing,
                  options::SolveOptions = _DEFAULT_OPTIONS,
+                 strategy::SolveStrategy = Monolithic(),
                  check::Bool = true)
     JuMP.owner_model(data) === block.model || throw(ArgumentError(
         "the dataset and the block belong to different models"))
     start === nothing || JuMP.owner_model(start) === block.model || throw(ArgumentError(
         "the starting values belong to a different model than the block"))
     check && assert_solvable(block)
-    return Problem(block, data, start, options)
+    return Problem(block, data, start, options, strategy)
 end
 
 function Problem(base::Problem;
@@ -118,12 +120,14 @@ function Problem(base::Problem;
                  data::Dataset = base.data,
                  start::Union{Nothing,Dataset} = base.start,
                  options::SolveOptions = base.options,
+                 strategy::SolveStrategy = base.strategy,
                  check::Bool = true)
     # The check reads nothing but the block, so deriving with the same block cannot change its
     # answer. Skipping it is exact, not an optimisation with a risk attached — and it is worth
     # skipping: the check is O(model), and deriving five shocks from one baseline is the idiom.
     recheck = check && block !== base.block
-    return Problem(block, data; start = start, options = options, check = recheck)
+    return Problem(block, data; start = start, options = options, strategy = strategy,
+                   check = recheck)
 end
 
 """
@@ -136,11 +140,13 @@ and leaves the problem's dataset untouched; `solve!` writes into it.
 Any keyword accepted by [`solve!`](@ref) overrides the problem's own options for this call.
 """
 function solve(p::Problem; kwargs...)
-    return solve(p.block, p.data; options = p.options, start_values = p.start, kwargs...)
+    return solve(p.block, p.data; options = p.options, start_values = p.start,
+                 strategy = p.strategy, kwargs...)
 end
 
 function solve!(p::Problem; kwargs...)
-    return solve!(p.block, p.data; options = p.options, start_values = p.start, kwargs...)
+    return solve!(p.block, p.data; options = p.options, start_values = p.start,
+                  strategy = p.strategy, kwargs...)
 end
 
 """

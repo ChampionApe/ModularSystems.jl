@@ -267,12 +267,31 @@
         @test tri[v.z] ≈ 12.0
     end
 
-    @testset "the strategy travels in the options like any other setting" begin
+    @testset "the strategy is not a setting, and SolveOptions refuses it" begin
+        # Every SolveOptions field means the same thing on any model. A strategy has preconditions —
+        # BlockTriangular raises on an objective, on a deficient system, on an inequality — so a
+        # reusable profile carrying one would fail on some of the models it was meant to be reused
+        # across. It belongs to the problem, not to the settings.
         b, d, v = cascade()
-        opts = SolveOptions(replace_nothing = 1.0, strategy = BlockTriangular())
-        @test solve(b, d; options = opts)[v.z] ≈ 12.0
-        # and a keyword still overrides it
-        @test solve(b, d; options = opts, strategy = Monolithic())[v.z] ≈ 12.0
+        @test_throws MethodError SolveOptions(strategy = BlockTriangular())
+        @test_throws ArgumentError SolveOptions(SolveOptions(); strategy = BlockTriangular())
+
+        opts = SolveOptions(replace_nothing = 1.0)
+        @test solve(b, d; options = opts, strategy = BlockTriangular())[v.z] ≈ 12.0
+        @test solve(b, d; options = opts)[v.z] ≈ 12.0           # Monolithic by default
+    end
+
+    @testset "a Problem carries its own strategy" begin
+        b, d, v = cascade()
+        p = Problem(b, d; options = SolveOptions(replace_nothing = 1.0),
+                    strategy = BlockTriangular())
+        @test p.strategy isa BlockTriangular
+        @test solve(p)[v.z] ≈ 12.0
+        # deriving carries it, and naming it replaces it
+        @test Problem(p; data = copy(d)).strategy isa BlockTriangular
+        @test Problem(p; strategy = Monolithic()).strategy isa Monolithic
+        # and a keyword at the call site still wins
+        @test solve(p; strategy = Monolithic())[v.z] ≈ 12.0
     end
 
     @testset "a subsystem solve records the total time and a termination status" begin

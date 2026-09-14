@@ -179,6 +179,9 @@ intrinsic JuMP bounds with the dataset's problem bounds.
   the same thing, and the settings can be named once and reused.
 - `start_values::Dataset`: starting points, falling back to `d`'s own values. Data rather than a
   setting, which is why it is a keyword of its own and not a field of `SolveOptions`.
+- `strategy::SolveStrategy = Monolithic()`: which algorithm. Also a keyword of its own, because it
+  has preconditions and so is a property of this problem rather than a reusable setting — see
+  [`SolveOptions`](@ref).
 
 !!! note
     `optimizer` names the solver for **this solve only** and does not attach it to the model.
@@ -193,12 +196,13 @@ function solve!(
     d::Dataset;
     options::SolveOptions = _DEFAULT_OPTIONS,
     start_values::Union{Nothing,Dataset} = nothing,
+    strategy::SolveStrategy = Monolithic(),
     kwargs...,
 )
     o = isempty(kwargs) ? options : SolveOptions(options; kwargs...)
     validate(b)
 
-    status, time, objective = _run(o.strategy, b, d, o, start_values)
+    status, time, objective = _run(strategy, b, d, o, start_values)
     d.meta.termination_status = status
     d.meta.solve_time = time
     d.meta.objective_value = objective

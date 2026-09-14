@@ -66,8 +66,11 @@ which is why they are not here.
   solver's own bound relaxation; see `notes/crossCuttingFindings.md` #1.
 - `silent`: suppress solver output.
 - `run_checks`, `check_atol`, `check_rtol`: evaluate `@check` constraints against the solution.
-- `strategy::SolveStrategy`: [`Monolithic`](@ref) or [`BlockTriangular`](@ref). The answer does not
-  depend on it, only the work done to reach it.
+
+The solve **strategy** is deliberately not here. Every field above is a knob that means the same
+thing on any model; [`SolveStrategy`](@ref) selects an algorithm with preconditions, so a profile
+carrying one would fail on some of the models it was meant to be reusable across. It belongs to the
+problem, and lives on [`Problem`](@ref) or as a keyword of [`solve`](@ref).
 
 # Examples
 ```jldoctest
@@ -88,7 +91,6 @@ struct SolveOptions
     run_checks::Bool
     check_atol::Float64
     check_rtol::Float64
-    strategy::SolveStrategy
 end
 
 SolveOptions(;
@@ -100,9 +102,8 @@ SolveOptions(;
     run_checks::Bool = true,
     check_atol::Real = 1e-6,
     check_rtol::Real = 1e-8,
-    strategy::SolveStrategy = Monolithic(),
 ) = SolveOptions(optimizer, replace_nothing, check_binding_bounds, bound_tolerance,
-                 silent, run_checks, check_atol, check_rtol, strategy)
+                 silent, run_checks, check_atol, check_rtol)
 
 # Built by field name rather than by listing them, so adding a field cannot leave the derive
 # constructor silently dropping it.

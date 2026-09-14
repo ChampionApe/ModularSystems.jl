@@ -142,6 +142,12 @@ quickstart. `optimizer` inside `SolveOptions` names the solver for **that solve 
 attach itself to the model — which is what lets a calibration use different solver settings from the
 baseline it feeds.
 
+One thing is deliberately *not* a setting. Every field above is a knob that means the same thing on
+any model, which is what makes a named set reusable. The solve
+[strategy](@ref Decomposition) selects an algorithm with preconditions, so a profile carrying one
+would fail on some of the models it was meant to be reused across. It is a keyword of `solve` and a
+field of [`Problem`](@ref) instead.
+
 ## When the system is not square
 
 A block may instead carry an objective, and is then solved as an optimization problem. Nothing else

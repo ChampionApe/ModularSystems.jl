@@ -501,6 +501,15 @@ calibration and the baseline it feeds could not then use different solvers, or t
 different attributes, without mutating something shared. `set_optimizer_factory!` remains, as the
 model's default.
 
+*The solve strategy is not a setting, and briefly was.* `SolveOptions` carried a `strategy` field
+until review pointed out it is the one field for which the type's own claim is false. Every other
+field is a knob that degrades gracefully on any model; a `SolveStrategy` selects an algorithm with
+preconditions — `BlockTriangular` raises on an objective, on a deficient system, on a solved
+inequality — so a named profile carrying one fails on some of the models it was meant to be reusable
+across, which is exactly what naming a profile is for. It is now a keyword of `solve` and a field of
+`Problem`. That sharpens both types rather than blurring one: `SolveOptions` is the model-independent
+settings, `Problem` is "this block, this data, this way".
+
 ### The pairing is also a matching
 
 *Decided 2026-09-14 — `notes/TODO.md` C14.*
