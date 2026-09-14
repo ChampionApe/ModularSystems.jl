@@ -3,17 +3,23 @@
 """
     SolveMetadata
 
-What a solve reports about itself, held per dataset. Every field is `nothing` until a solve writes it.
+What a solve reports about itself, held per dataset. Every field is empty until a solve writes it.
+
+`binding_bounds` lists the unknowns sitting on a bound at the solution, paired with the bound. On a
+square system that is an error and [`solve`](@ref) raises; on a block with an objective it is normal,
+so it is recorded here instead of interrupting.
 """
 mutable struct SolveMetadata
     termination_status::Any
     objective_value::Union{Nothing,Float64}
     solve_time::Union{Nothing,Float64}
+    binding_bounds::Vector{Tuple{VariableRef,Float64}}
 end
 
-SolveMetadata() = SolveMetadata(nothing, nothing, nothing)
+SolveMetadata() = SolveMetadata(nothing, nothing, nothing, Tuple{VariableRef,Float64}[])
 
-Base.copy(m::SolveMetadata) = SolveMetadata(m.termination_status, m.objective_value, m.solve_time)
+Base.copy(m::SolveMetadata) = SolveMetadata(
+    m.termination_status, m.objective_value, m.solve_time, copy(m.binding_bounds))
 
 """
     Dataset{T}(model)

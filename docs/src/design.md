@@ -177,7 +177,15 @@ than a mysterious infeasibility. If a bound is active at the solution of a *squa
 answer is not the solution of that system — the problem has silently become a complementarity
 problem, and the solver reports success. That is a wrong answer delivered quietly, which is worse
 than an interruption, so it raises. On the optimization path a binding bound is normal and is
-reported, not raised. An opt-out keyword follows `presolve_diagnostics`.
+reported in the dataset's solve metadata, not raised. An opt-out keyword follows
+`presolve_diagnostics`.
+
+One thing this cost in practice, recorded because it would silently disable the check: **the
+tolerance must be looser than the solver's own bound relaxation.** An interior-point solver does not
+land on a bound — Ipopt relaxes bounds and stops slightly *outside*, measured at about 1.7e-8 below a
+lower bound. A tolerance at solver precision therefore detects nothing at all. The default is 1e-6,
+scaled by the magnitude of the bound, and `test/optimize.jl` pins the behaviour so tightening it
+cannot pass unnoticed.
 
 This diagnostic is the strongest argument for the split above: it has to distinguish a bound imposed
 for this problem from a bound intrinsic to the variable, which is only possible if the two are stored

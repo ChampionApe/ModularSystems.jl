@@ -137,6 +137,11 @@ function _build_model(b::Block, d::Dataset; start_values, replace_nothing, silen
         start === nothing || isnan(start) || JuMP.set_start_value(nv, start)
     end
 
+    if b.objective !== nothing
+        sense, func = b.objective
+        JuMP.set_objective(sm, sense, _substitute(func, map, d))
+    end
+
     n = 0
     for c in b.constraints
         is_solved(c) || continue
@@ -172,14 +177,20 @@ intrinsic JuMP bounds with the dataset's problem bounds.
 - `replace_nothing::Number`: starting point for an unknown with no value anywhere. Useful in early
   calibration, when a variable exists but has no data yet.
 - `check_binding_bounds::Bool = true`: on a square system, raise [`BindingBoundError`](@ref) if a
-  bound is active at the solution.
-- `bound_tolerance::Real = 1e-8`: how close to a bound counts as sitting on it.
+  bound is active at the solution. Bounds active on an optimization solve are recorded in
+  `meta.binding_bounds` and never raised — there they are expected.
+- `bound_tolerance::Real = 1e-6`: how close to a bound counts as sitting on it, as
+  `max(tol, tol * |bound|)` so it holds at any scale. It must not be tighter than the solver's own
+  bound relaxation — an interior-point solver stops a little *outside* a bound (Ipopt by around
+  2e-8), so a tolerance of 1e-8 would never fire.
 - `silent::Bool = true`: suppress solver output. The intermediate model is built here rather than by
   the caller, so it does not inherit their verbosity setting; pass `false` to see the solver's log.
 - `run_checks::Bool = true`, `check_atol`, `check_rtol`: evaluate the block's `@check` constraints
   against the solution, raising [`CheckFailure`](@ref) on a miss.
 
-Only square systems are solved so far; a block carrying an objective raises.
+A block carrying an objective is solved as an optimization problem: the objective is substituted
+from the dataset like any other expression and attached to the same intermediate model, so the two
+paths differ only at the tail. `meta.objective_value` records its value.
 """
 function solve!(
     b::Block,
@@ -188,16 +199,13 @@ function solve!(
     start_values::Union{Nothing,Dataset} = nothing,
     replace_nothing::Union{Nothing,Number} = nothing,
     check_binding_bounds::Bool = true,
-    bound_tolerance::Real = 1e-8,
+    bound_tolerance::Real = 1e-6,
     silent::Bool = true,
     run_checks::Bool = true,
     check_atol::Real = 1e-6,
     check_rtol::Real = 1e-8,
 )
     validate(b)
-    b.objective === nothing || throw(ArgumentError(
-        "this block carries an objective; the optimization path is not implemented yet"))
-
     optimizer === nothing || set_optimizer_factory!(b.model, optimizer)
     sm, map = _build_model(
         b, d; start_values = start_values, replace_nothing = replace_nothing, silent = silent)
@@ -211,9 +219,13 @@ function solve!(
 
     d.meta.termination_status = JuMP.termination_status(sm)
     d.meta.solve_time = JuMP.solve_time(sm)
+    d.meta.objective_value = b.objective === nothing ? nothing : JuMP.objective_value(sm)
 
-    if check_binding_bounds && issquare(b)
-        _assert_no_binding_bounds(b, d, bound_tolerance)
+    # Always computed, so the optimization path gets the report for free; only raised on the square
+    # path, where an active bound means the system did not determine the answer.
+    d.meta.binding_bounds = _binding_bounds(b, d, bound_tolerance)
+    if check_binding_bounds && issquare(b) && !isempty(d.meta.binding_bounds)
+        throw(BindingBoundError(d.meta.binding_bounds))
     end
     run_checks && assert_checks(b, d; atol = check_atol, rtol = check_rtol)
     return d
@@ -231,17 +243,22 @@ function solve(b::Block, d::Dataset; kwargs...)
     return out
 end
 
-function _assert_no_binding_bounds(b::Block, d::Dataset, tol::Real)
+# An interior-point solver does not land exactly on a bound: Ipopt relaxes bounds by roughly 1e-8 and
+# stops slightly outside. A tolerance tighter than that relaxation detects nothing at all, which is
+# why the default is 1e-6 rather than solver-precision. Scaled by the bound so it holds at any
+# magnitude.
+_on_bound(val, bound, tol) = abs(val - bound) <= max(tol, tol * abs(bound))
+
+function _binding_bounds(b::Block, d::Dataset, tol::Real)
     hits = Tuple{VariableRef,Float64}[]
     for v in unknowns(b)
         val = d[v]
         val === nothing && continue
         lo, hi = _effective_bounds(d, v)
-        lo === nothing || abs(val - lo) > tol || push!(hits, (v, float(lo)))
-        hi === nothing || abs(val - hi) > tol || push!(hits, (v, float(hi)))
+        lo === nothing || !_on_bound(val, lo, tol) || push!(hits, (v, float(lo)))
+        hi === nothing || !_on_bound(val, hi, tol) || push!(hits, (v, float(hi)))
     end
-    isempty(hits) || throw(BindingBoundError(hits))
-    return nothing
+    return hits
 end
 
 # ---------------------------------------------------------------------------------------------

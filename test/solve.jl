@@ -167,18 +167,17 @@
         @test out[x] ≈ -3.0 atol = 1e-6
     end
 
-    @testset "a block with an objective is refused, not silently solved as square" begin
+    @testset "a block with an objective takes the optimization path" begin
         m = Model()
-        set_optimizer_factory!(m, Ipopt.Optimizer)
+        set_optimizer_factory!(m, optimizer_with_attributes(Ipopt.Optimizer, "sb" => "yes"))
         @variable(m, x)
         b = Block(m)
         add_constraint!(b, @build_constraint(x >= 1))
         set_unknowns!(b, x)
         set_objective!(b, MOI.MIN_SENSE, x)
-        d = Dataset(m)
-        err = try; solve(b, d; replace_nothing = 1.0); catch e; e; end
-        @test err isa ArgumentError
-        @test occursin("optimization path is not implemented", err.msg)
+        out = solve(b, Dataset(m); replace_nothing = 5.0)
+        @test out[x] ≈ 1.0 atol = 1e-6
+        @test out.meta.objective_value ≈ 1.0 atol = 1e-6
     end
 
     @testset "a block declared square but not square fails before the solver runs" begin

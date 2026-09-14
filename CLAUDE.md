@@ -22,9 +22,10 @@ writing code — several decisions are taken and should not be re-litigated, and
 deliberately open.
 
 What exists: `Dataset` and the model layout, `VariableGroup`, `Block`, the `@block` and `@group`
-macros, and the square solve path with bounds, the binding-bound check and `@check` evaluation
-(I1–I5, all closed). What does not: the optimization path, residuals, swapping, `IndexSet`, tags
-(I6) and `diagnose`. `notes/TODO.md` has the live list.
+macros, and **both solve paths** — square, and optimization for a block carrying an objective — with
+bounds, the binding-bound check and `@check` evaluation. What does not: block composition (C6),
+residuals (C7), swapping (C3), `IndexSet`, tags (I6) and `diagnose`. `notes/TODO.md` has the live
+list.
 
 **Squareness is a predicate, not an invariant.** A block does not have to pair every constraint with
 a variable, and a block with an objective is solved as an optimization problem. Anything that assumes

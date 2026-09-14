@@ -97,6 +97,66 @@ julia> round(multipliers[L[2]], digits = 4)
 Arithmetic works on values and returns a value-only dataset: bounds and solve metadata are dropped,
 because a ratio of two scenarios is not itself a scenario.
 
+## When the system is not square
+
+A block may instead carry an objective, and is then solved as an optimization problem. Nothing else
+changes: the same macro, the same dataset, the same substitution of exogenous values.
+
+```jldoctest quickstart
+julia> @variable(model, Lhat[J]);   # observed labour demand
+
+julia> @variable(model, rho_bar);   # one productivity shared by both types
+
+julia> estimation = @block model begin
+           @unknowns rho_bar, L
+           [j in J], L[j] == rho_bar * N[j]
+           @objective Min sum((L[j] - Lhat[j])^2 for j in J)
+       end;
+
+julia> issquare(estimation)
+false
+
+julia> degrees_of_freedom(estimation)
+1
+
+julia> obs = Dataset(model);
+
+julia> obs[N] = [100.0, 200.0];
+
+julia> obs[Lhat] = [110.0, 190.0];
+
+julia> fitted = solve(estimation, obs; replace_nothing = 1.0);
+
+julia> round(fitted[rho_bar], digits = 4)
+0.98
+```
+
+Two unknowns, one equation each, and an objective — so one degree of freedom, and least squares picks
+the point. `issquare` is `false` and nothing complains, because squareness is a property of a block
+rather than a requirement of one.
+
+Pairings are still allowed on a block with an objective; they are simply inert, since the pairing is
+documentation and a square-solver precondition rather than something that orders the system.
+
+## Bounds
+
+Bounds intrinsic to a variable — `K >= 0` — belong on the JuMP variable. Bounds that belong to *this*
+problem go in the dataset, where they can differ between scenarios:
+
+```jldoctest quickstart
+julia> set_bounds!(data, L[1]; lower = 0.0);
+
+julia> bounds(data, L[1])
+(0.0, nothing)
+```
+
+The bound applied at solve time is the intersection of the two, and an empty intersection raises
+rather than surfacing later as an unexplained infeasibility.
+
+On a **square** solve, a bound that is active at the solution raises [`BindingBoundError`](@ref): the
+system did not determine the answer, and the solver would have reported success anyway. On an
+optimization solve an active bound is expected, so it is recorded in `meta.binding_bounds` instead.
+
 ## Blocks, pairings and squareness
 
 A **block** is a composable collection of constraints over a JuMP model, together with the set of

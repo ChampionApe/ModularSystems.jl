@@ -16,4 +16,5 @@ using Test
     include("block.jl")
     include("solve.jl")
     include("macro.jl")
+    include("optimize.jl")
 end

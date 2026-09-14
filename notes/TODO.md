@@ -30,6 +30,12 @@ in I1 would have been a wrong-answer hazard.
 **I5. ~~`@block`.~~** Closed 2026-09-14. `src/macro.jl`, plus `@group` sharing its index parser.
 `@check` and its post-solve evaluation came with it, for the same reason as the bounds.
 
+**I7. ~~Implement the optimization path.~~** Closed 2026-09-14. The objective is substituted like any
+other expression and attached to the same intermediate model, so the two paths differ only at the
+tail, as the C3 decision predicted. A binding bound is recorded rather than raised here. The bound
+tolerance had to be loosened to 1e-6: an interior-point solver stops slightly outside a bound, so a
+tolerance at solver precision detects nothing — pinned by a regression test.
+
 **I6. Implement tags.** `tag!` / `tagged` / `has_tag` and `describe!` / `description`, stored in
 `model.ext` and keyed on `VariableRef`, per the C8 decision. Not needed by the solve path, which is
 why it was not in I1–I5.
@@ -38,7 +44,8 @@ I4 before I5 was the right call: two macro bugs (a pre-escaped body handed to
 `JuMP.@build_constraint`, and `_parse_head(nothing)`) were easy to localise because everything under
 them was already tested.
 
-Still not implemented: the objective path, residuals, swapping, `IndexSet`, `diagnose`, tags (I6).
+Still not implemented: block composition (C6), residuals (C7), swapping (C3), `IndexSet`,
+`diagnose`, tags (I6).
 
 ## Code and design
 
