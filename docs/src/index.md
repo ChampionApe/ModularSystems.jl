@@ -34,13 +34,12 @@ julia> set_optimizer_factory!(model, optimizer_with_attributes(Ipopt.Optimizer, 
 
 julia> J = 1:2;
 
-julia> @variable(model, L[J]);   # labour demand
-
-julia> @variable(model, w[J]);   # wage
-
-julia> @variable(model, N[J]);   # workforce
-
-julia> @variable(model, rho[J]); # productivity
+julia> L, w, N, rho = @declare model begin
+           L[J],   "Labour demand"
+           w[J],   "Wage"
+           N[J],   "Workforce (exogenous)"
+           rho[J], "Productivity (calibrated)"
+       end;
 
 julia> block = @block model begin
            @square
@@ -54,6 +53,11 @@ true
 julia> degrees_of_freedom(block)
 0
 ```
+
+[`@declare`](@ref) is `JuMP.@variables` with a description column: the rows are handed to JuMP
+unchanged and it returns the same tuple of containers, so `@variable` and `JuMP.@variables` remain
+equally valid ways to declare. Descriptions are optional per row, and a row without one is an
+ordinary JuMP declaration.
 
 `@square` is an assertion: the block claims to be square and is checked as it is built. Drop it and
 nothing is checked — squareness is a property here, not a requirement.
@@ -651,6 +655,39 @@ julia> describe!(model, w, "Wage by labour type");
 julia> description(w[1])
 "Wage by labour type"
 ```
+
+### Attaching both at declaration
+
+[`@declare`](@ref) is the shorthand for doing this while the variables are being written down: a
+description per row, and tags after `::` that apply to **everything the block declares**, anonymous
+rows included.
+
+```jldoctest declare
+julia> using ModularSystems, JuMP
+
+julia> const Quantity = Tag(:quantity);
+
+julia> m = Model(); T = 2020:2022;
+
+julia> qGDP, qC = @declare m::Quantity begin
+           qGDP[t in T], "Real GDP"
+           qC[t in T] >= 0, (start = 1.0), "Real consumption"
+       end;
+
+julia> description(qGDP[2021])
+"Real GDP"
+
+julia> length(tagged(m, Quantity))
+6
+
+julia> lower_bound(qC[2020]), start_value(qC[2020])
+(0.0, 1.0)
+```
+
+Bounds, `start` and every other JuMP argument pass straight through — the description is the last
+positional entry in the row and the only part `@declare` reads. Per-variable tags are `tag!` on a
+following line; nothing is lost by declaring with `@variable` instead and attaching both afterwards,
+which is what `@declare` expands to.
 
 ## Sparse patterns
 

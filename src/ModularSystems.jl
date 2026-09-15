@@ -29,6 +29,7 @@ include("solve.jl")
 include("macro.jl")
 include("diagnose.jl")
 include("tags.jl")
+include("declare.jl")
 include("indexset.jl")
 include("swap.jl")
 include("residuals.jl")
@@ -45,7 +46,7 @@ export solved_constraints, checked_constraints
 export solve, solve!, set_optimizer_factory!, BindingBoundError, SolveOptions
 export SolveStrategy, Monolithic, BlockTriangular, SubSystemFailure
 export add_check!, assert_checks, CheckFailure
-export @block, @group
+export @block, @group, @declare
 export diagnose, Diagnosis, isclean, variables_in
 export decompose, Decomposition, SubSystem, subsystems, overdetermined,
        underdetermined, iswelldetermined, largest_subsystem

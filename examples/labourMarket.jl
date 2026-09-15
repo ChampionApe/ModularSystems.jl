@@ -14,12 +14,15 @@ const J = 1:2   # labour types
 model = Model()
 set_optimizer_factory!(model, optimizer_with_attributes(Ipopt.Optimizer, "sb" => "yes"))
 
-@variable(model, L[J])      # labour demand
-@variable(model, w[J])      # wage
-@variable(model, Y)         # output
-@variable(model, p)         # price
-@variable(model, N[J])      # workforce            (exogenous)
-@variable(model, rho[J])    # productivity         (calibrated)
+# A description per row, so the label survives into a table or a plot rather than staying a comment.
+L, w, Y, p, N, rho = @declare model begin
+    L[J],   "Labour demand"
+    w[J],   "Wage"
+    Y,      "Output"
+    p,      "Price"
+    N[J],   "Workforce (exogenous)"
+    rho[J], "Productivity (calibrated)"
+end
 
 # The behavioural block: each equation sits next to the variable it determines.
 behavioural = @block model begin

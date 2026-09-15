@@ -176,6 +176,14 @@ whole horizon at once. `restrict(block, group)` was considered for the case of a
 already written as one `@block`, and deliberately not built: it needs three judgement calls with no
 right answer. Reasoning in `docs/src/design.md`.
 
+**C23. ~~A block declaration form carrying descriptions.~~** Closed 2026-09-15, raised by RKB the same
+day after reading SquareModels' `@variables`. `@declare` in `src/declare.jl`: rows go to
+`JuMP.@variables` untouched, a trailing string becomes a `describe!`, and tags after `::` apply to
+every variable the block declares. It is sugar over C8's functions, not a second mechanism, and the
+name avoids JuMP's export. Descriptions attach by tuple position rather than by parsing names out of
+declaration heads, which is what makes `0 <= x <= 1` and anonymous rows work. Reasoning in
+`docs/src/design.md`.
+
 ## Documentation
 
 **D1. ~~Fill in the manual.~~** Closed 2026-09-14: `docs/src/index.md` has a doctested quickstart,

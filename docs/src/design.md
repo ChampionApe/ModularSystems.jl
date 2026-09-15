@@ -734,6 +734,40 @@ This is the second time non-mutating composition has cost something quadratic �
 scanned every existing constraint for a duplicate pairing until C6 replaced it with a `Set`. The
 pattern is worth naming: an operation that is cheap for two and used for two thousand.
 
+### A declaration shorthand, under a name JuMP does not own
+
+*Decided 2026-09-15 — `notes/TODO.md` C23.*
+
+`@declare model begin ... end` is `JuMP.@variables` with a description as the last positional entry of
+a row, and tags after `::` applying to every variable the block declares.
+
+This does not reopen C8. Two things were conflated there and are separable: *what* metadata is
+attached, and *where* it is written. C8 settled the first — metadata is keyed on `VariableRef`,
+attached by function, never at a shadowed `@variables` — and this changes none of it, because the
+macro expands to exactly the `describe!` and `tag!` calls a user would write by hand. What it changes
+is the second, and only as sugar: the rows go to `JuMP.@variables` untouched and the return value is
+JuMP's own tuple, so there is no second declaration mechanism to keep in step, and a model written
+with `@variable` behaves identically.
+
+The name is the whole reason this is a decision rather than a patch. `@variables` is a JuMP export, so
+taking it would force every user of both packages to qualify — the same cost that ruled out `fix`. The
+description slot is safe to claim because JuMP *rejects* a bare positional string today
+("Unrecognized positional arguments"), which is a slot it cannot later want.
+
+Descriptions attach **by tuple position**, not by parsing the name out of the row. `JuMP.@variables`
+returns one element per row in row order, so the container is already in hand: there is nothing to
+guess about which side of `0 <= x <= 1` is the variable, and anonymous rows — which have no name at
+all — get their description and tags like any other. A parser over declaration heads would have been
+a second, weaker copy of JuMP's own.
+
+Tags are block-level only. Per-row tags are a `tag!` line, on the grounds that the exported surface is
+the product: `::` inside a row would be a third place where a tag can be written, buying a line.
+
+Two hygiene traps are recorded in the source because both are silent and neither is guessable: the
+macro hands `JuMP.@variables` a **gensym escaped into the caller's scope**, since that macro escapes
+its own arguments; and the whole nested macrocall is escaped, because hygiene otherwise descends into
+its arguments and resolves the user's index sets in `ModularSystems` — `J` became `ModularSystems.J`.
+
 ## Open
 
 **Whether slices return views** (C12) and **a sparse notation layer** (C13) are both deferred

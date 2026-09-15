@@ -22,6 +22,7 @@ using Test
     include("diagnose.jl")
     include("decompose.jl")
     include("tags.jl")
+    include("declare.jl")
     include("indexset.jl")
     include("swap.jl")
     include("residuals.jl")

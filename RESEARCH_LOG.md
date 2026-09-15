@@ -10,6 +10,25 @@ points at it. When this file passes a few hundred lines, move the old entries to
 
 Entries are written at the *end* of a session, not during it.
 
+## 2026-09-15 — A declaration shorthand, and the data–model link compared
+
+RKB asked whether variables could be declared many at a time with a description, as SquareModels'
+`@variables` does. They can: `@declare` (C23, `src/declare.jl`) hands each row to `JuMP.@variables`
+untouched, turns a trailing string into a `describe!`, and applies tags written after `::` to every
+variable the block declares. It is sugar over the C8 functions, not a second mechanism, and the name
+avoids JuMP's export — which is the part that made it a decision. 709 tests; the quickstart and
+`examples/labourMarket.jl` now use it, so the trailing comments became real metadata.
+
+The implementation lesson is that descriptions attach by **tuple position**, not by parsing names out
+of declaration heads: `JuMP.@variables` returns one container per row, so `0 <= x <= 1` and anonymous
+rows need no special case. Two hygiene traps are commented in the source; the second — hygiene
+descending into a nested macrocall's arguments and resolving `J` as `ModularSystems.J` — has a
+regression test.
+
+Also compared our data–model link with theirs, at RKB's question. Same direction (data holds the
+model) and both cache a layout in `model.ext`; we differ in keying on the MOI slot rather than the
+variable name, which is why we need no revision counter and they get `d.σ` and name-keyed IO.
+
 ## 2026-09-14 — Structure for naming what a model can be solved as, and three things that needed nothing
 
 RKB asked whether combinations of block, variables and data that are known to be solvable should be a
