@@ -22,7 +22,13 @@ which nothing checked before. 712 tests.
 
 T2 closed: `version = "0.1.0"`, `TagBot.yml`, `CompatHelper.yml`, and `workflow_dispatch` on the docs
 workflow because a TagBot tag does not trigger one. `CLAUDE.md` said T2 was all that was left, which
-was wrong — C17, C12 and C13 are deferred behind triggers, not closed; fixed.
+was wrong — C17, C12 and C13 are deferred behind triggers, not closed; fixed. Registered as
+JuliaRegistries/General#168334, in the three-day waiting period for a new package.
+
+MEE is the first use case and is now dev-linked to this working copy. The rules for the pair are in
+`CLAUDE.md` here and in MEE's, in the same words; the only automation is the new `Examples` CI job,
+because `examples/*.jl` ran nowhere — doctests do not cover them and `Pkg.test` does not include them,
+so a harvested example could rot silently.
 
 ## 2026-09-15 — A declaration shorthand, and the data–model link compared
 

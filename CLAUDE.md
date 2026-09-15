@@ -122,6 +122,29 @@ Julia 1.10.5 locally; `[compat]` declares `julia = "1.10"` and CI tests 1.10 and
 - **Long runs go detached.** Anything past a few minutes — a solver benchmark, a large sweep — is
   started as a detached job writing to `logs/`, not held inside a session. See `notes/detachedRuns.md`.
 
+## The first use case: MEE
+
+`ChampionApe/MEE` is the first model built on this package, developed alongside it. The same rules are
+written in that repository's `CLAUDE.md`; change one and change the other.
+
+- **The link is `Pkg.develop`, not a release.** MEE's `julia/` environment dev-links this path, so an
+  edit here is visible there immediately and no version is cut to unblock a model. MEE switches to the
+  registered version when its results have to be reproducible elsewhere.
+- **One list, and it is here.** Friction MEE hits belongs in `notes/TODO.md` as a numbered item with
+  the model snippet that caused it. MEE's own `notes/TODO.md` tracks MEE, never this package.
+- **Change on the second occurrence.** Write the friction down at once; change the package when the
+  same friction appears twice, or once with a measurement behind it. A package shaped by one model at
+  first contact acquires that model's accidents.
+- **Harvest, by trigger.** A package change made *because* of MEE lands as a regression test in
+  `test/` in the same commit — the distilled case, never the model. A structural pattern MEE uses
+  twice becomes an `examples/` script or a manual paragraph. A number bearing on C17, C12 or C13 goes
+  to `archive/` with a pointer from `notes/TODO.md`.
+- **Never copy code between the repositories.** A harvested example is a rewrite with synthetic
+  numbers, cheap enough to run in CI — `examples/` is executed by the `Examples` job on every push.
+- **Versions.** No release per change while dev-linked. Register when the API has settled or when MEE
+  needs the registry; a breaking change to an export is a minor bump under 0.x, with release notes in
+  the `@JuliaRegistrator register` comment.
+
 ## Local gotchas
 
 Things that cost an hour once and would cost it again. All Windows:

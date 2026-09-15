@@ -31,3 +31,26 @@ jobs:
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+
+  # The examples are executed nowhere else: the docs build runs doctests, and `Pkg.test` does not
+  # include them. Without this they can fall behind an API change silently, which is exactly what a
+  # harvested example does. They run in the docs environment because that is where the solver lives.
+  examples:
+    name: Examples
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+      - name: Install the docs environment
+        run: julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path = pwd())); Pkg.instantiate()'
+      - name: Run every example
+        run: |
+          for f in examples/*.jl; do
+            echo "::group::$f"
+            julia --project=docs "$f" || exit 1
+            echo "::endgroup::"
+          done
