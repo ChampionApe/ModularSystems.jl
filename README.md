@@ -29,7 +29,8 @@ minimum-distance estimation, and a model can be held as a set of named, checked 
 | `Problem`, `ModelSpec` | named configurations of a model, and the set of them |
 | `fixed_point!` | soft-linked models iterated to agreement, raising if they do not settle |
 
-**Nothing in the API is stable**, and the package is not registered.
+**The API is early**: v0.1.0 is the first release, and while the version is 0.x a breaking change to
+an export gets a minor bump rather than a deprecation cycle.
 
 `docs/src/design.md` has what is decided and why; `notes/TODO.md` has the open questions and the
 implementation order.

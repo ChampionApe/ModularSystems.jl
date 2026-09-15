@@ -5,6 +5,7 @@ on:
     branches: [main]
     tags: ['*']
   pull_request:
+  workflow_dispatch:      # so a release tag's versioned docs can be built by hand; see TagBot.yml
 
 jobs:
   build:

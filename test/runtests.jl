@@ -7,7 +7,9 @@ using Test
 # One file per source file, each with a @testset named after it — a failure names its own file.
 @testset "ModularSystems.jl" begin
     @testset "scaffolding" begin
-        @test ModularSystemsVersion() == v"0.1.0-DEV"
+        # Against `pkgversion`, not a literal: a version bump should not fail the suite, and what
+        # the docstring promises is that the file and the package manager agree.
+        @test ModularSystemsVersion() == pkgversion(ModularSystems)
     end
 
     include("layout.jl")

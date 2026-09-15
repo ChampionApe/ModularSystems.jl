@@ -23,9 +23,10 @@ writing code — several decisions are taken and should not be re-litigated, and
 deliberately open.
 
 **Every recorded design decision is implemented.** Both solve paths work; so do composition,
-swapping, groups, tags, `IndexSet`, `diagnose` and opt-in residuals. `notes/TODO.md` lists what is
-left, which is registration (T2) and nothing else. `notes/TODO.md` has the live
-list.
+swapping, groups, tags, `IndexSet`, `diagnose` and opt-in residuals. What is left in `notes/TODO.md`
+is C17, C12 and C13, each deferred behind a stated trigger — a model past ~21,500 unknowns, a
+measurement showing slice access is hot, and two or three real models respectively. None of them is
+waiting on a decision; they are waiting on a use case. `notes/TODO.md` has the live list.
 
 **Squareness is a predicate, not an invariant.** A block does not have to pair every constraint with
 a variable, and a block with an objective is solved as an optimization problem. Anything that assumes

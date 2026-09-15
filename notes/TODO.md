@@ -200,9 +200,17 @@ set.
 both workflows green, Pages serving from `gh-pages` at
 <https://championape.github.io/ModularSystems.jl/>.
 
-**T2. Decide whether to register the package.** If yes, add `TagBot.yml` and `CompatHelper.yml`
-workflows and a `[compat]` entry for every dependency — General registry rejects a package without
-them. Deliberately deferred, not forgotten.
+**T2. ~~Decide whether to register the package.~~** Closed 2026-09-15: yes, so the first outside use
+case can `Pkg.add` it rather than track a URL. `version = "0.1.0"`, `TagBot.yml` and
+`CompatHelper.yml` added, `[compat]` already complete in all three environments. Registration itself
+is a comment on the release commit (`@JuliaRegistrator register`) and needs the JuliaRegistrator app
+installed on the repository; the General registry's merge is what creates the tag, via TagBot.
+
+Two consequences to keep in mind. A tag pushed by TagBot does not trigger workflows, so versioned
+docs are built by hand from the Actions tab — `Documentation.yml` has `workflow_dispatch` for that,
+and the `dev` docs are unaffected. And the exported surface is now a semver promise: a breaking
+change to an export needs a minor bump while the version is 0.x, which is the discipline the README's
+"nothing in the API is stable" line used to buy for free.
 
 ## Traps
 

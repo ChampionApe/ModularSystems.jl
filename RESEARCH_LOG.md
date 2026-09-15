@@ -10,6 +10,20 @@ points at it. When this file passes a few hundred lines, move the old entries to
 
 Entries are written at the *end* of a session, not during it.
 
+## 2026-09-15 (second session) — The manual stops destructuring, and the package is registered
+
+RKB asked why SquareModels' `@variables` needs no `X, Y = ` line and ours seemed to. It does not:
+`JuMP.@variable` binds each named row in the caller's scope, SquareModels expands to one such call per
+row, and `@declare` inherits the same behaviour through `JuMP.@variables`. The assignment was habit,
+taught by our own docs. Removed from the quickstart, the tag section, the `@declare` docstring and
+`examples/labourMarket.jl`, with the point stated once — values are read and written through a
+`Dataset`, the container is only the key. One new testset in `test/declare.jl` holds the binding,
+which nothing checked before. 712 tests.
+
+T2 closed: `version = "0.1.0"`, `TagBot.yml`, `CompatHelper.yml`, and `workflow_dispatch` on the docs
+workflow because a TagBot tag does not trigger one. `CLAUDE.md` said T2 was all that was left, which
+was wrong — C17, C12 and C13 are deferred behind triggers, not closed; fixed.
+
 ## 2026-09-15 — A declaration shorthand, and the data–model link compared
 
 RKB asked whether variables could be declared many at a time with a description, as SquareModels'

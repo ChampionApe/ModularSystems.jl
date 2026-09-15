@@ -66,8 +66,8 @@ from what the package manager sees.
 
 # Examples
 ```jldoctest
-julia> ModularSystemsVersion()
-v"0.1.0-DEV"
+julia> ModularSystemsVersion() == pkgversion(ModularSystems)
+true
 ```
 """
 function ModularSystemsVersion()

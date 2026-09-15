@@ -49,9 +49,11 @@ end
 ```
 
 The rows are handed to `JuMP.@variables` unchanged, so every JuMP declaration form keeps working and
-the return value is the same: a tuple of the declared containers, in row order. A description is
-attached with [`describe!`](@ref) and a tag with [`tag!`](@ref), which is also how either is added to
-a variable declared some other way — this macro is a shorthand, never a second mechanism.
+each named row binds its name in the enclosing scope, exactly as `@variable` does — there is nothing
+to destructure. The block also evaluates to JuMP's tuple of the declared containers, in row order,
+which is what reaches anonymous rows. A description is attached with [`describe!`](@ref) and a tag
+with [`tag!`](@ref), which is also how either is added to a variable declared some other way — this
+macro is a shorthand, never a second mechanism.
 
 Tags after `::` apply to **every** variable the block declares, including anonymous ones:
 
@@ -74,7 +76,7 @@ julia> const Quantity = Tag(:quantity);
 
 julia> J = 1:2;
 
-julia> L, w, Y = @declare model::Quantity begin
+julia> @declare model::Quantity begin
            L[j in J],      "Labour demand"
            w[j in J] >= 0, "Wage"
            Y,              "Output"

@@ -34,7 +34,7 @@ julia> set_optimizer_factory!(model, optimizer_with_attributes(Ipopt.Optimizer, 
 
 julia> J = 1:2;
 
-julia> L, w, N, rho = @declare model begin
+julia> @declare model begin
            L[J],   "Labour demand"
            w[J],   "Wage"
            N[J],   "Workforce (exogenous)"
@@ -55,9 +55,13 @@ julia> degrees_of_freedom(block)
 ```
 
 [`@declare`](@ref) is `JuMP.@variables` with a description column: the rows are handed to JuMP
-unchanged and it returns the same tuple of containers, so `@variable` and `JuMP.@variables` remain
-equally valid ways to declare. Descriptions are optional per row, and a row without one is an
-ordinary JuMP declaration.
+unchanged, so `@variable` and `JuMP.@variables` remain equally valid ways to declare. Descriptions
+are optional per row, and a row without one is an ordinary JuMP declaration.
+
+Each named row binds its name in the enclosing scope, exactly as `@variable` does — `L` above is the
+container, with nothing to destructure. The block does also evaluate to JuMP's tuple of containers,
+in row order, but assigning it is rarely what you want: values are read and written through a
+[`Dataset`](@ref), and the container is only the key.
 
 `@square` is an assertion: the block claims to be square and is checked as it is built. Drop it and
 nothing is checked — squareness is a property here, not a requirement.
@@ -669,7 +673,7 @@ julia> const Quantity = Tag(:quantity);
 
 julia> m = Model(); T = 2020:2022;
 
-julia> qGDP, qC = @declare m::Quantity begin
+julia> @declare m::Quantity begin
            qGDP[t in T], "Real GDP"
            qC[t in T] >= 0, (start = 1.0), "Real consumption"
        end;
@@ -685,9 +689,10 @@ julia> lower_bound(qC[2020]), start_value(qC[2020])
 ```
 
 Bounds, `start` and every other JuMP argument pass straight through — the description is the last
-positional entry in the row and the only part `@declare` reads. Per-variable tags are `tag!` on a
-following line; nothing is lost by declaring with `@variable` instead and attaching both afterwards,
-which is what `@declare` expands to.
+positional entry in the row and the only part `@declare` reads. `qGDP` and `qC` are bound by the
+declaration itself, as they would be under `@variable`. Per-variable tags are `tag!` on a following
+line; nothing is lost by declaring with `@variable` instead and attaching both afterwards, which is
+what `@declare` expands to.
 
 ## Sparse patterns
 

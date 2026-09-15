@@ -17,6 +17,19 @@
         @test description(Y) == "Output"
     end
 
+    @testset "named rows bind their names, so nothing needs destructuring" begin
+        # The manual declares without an assignment; the binding comes from `JuMP.@variable`.
+        m = Model()
+        J = 1:2
+        @declare m begin
+            K[j in J], "Capital"
+            r >= 0,    "Rental rate"
+        end
+        @test K isa AbstractArray && length(K) == 2
+        @test description(K[1]) == "Capital"
+        @test lower_bound(r) == 0.0
+    end
+
     @testset "the return value is JuMP's: a tuple in row order" begin
         m = Model()
         declared = @declare m begin
